@@ -1,0 +1,52 @@
+{
+   "name": "distract",
+   "private": true,
+   "version": "0.0.0",
+   "type": "module",
+   "scripts": {
+      "dev": "npm run py:dev && vite",
+      "build": "npm run clean && npm run py:build && vue-tsc && vite build && electron-builder",
+      "py:dev": "echo 'Running with system Python (dev mode)'",
+      "py:build": "py\\venv\\Scripts\\python -m PyInstaller --onefile py/main.py --distpath dist-py --name main",
+      "preview": "vite preview",
+      "clean": "rimraf dist dist-electron dist-py release"
+   },
+   "dependencies": {
+      "@tailwindcss/vite": "^4.1.13",
+      "tailwindcss": "^4.1.13",
+      "vue": "^3.4.21"
+   },
+   "devDependencies": {
+      "@vitejs/plugin-vue": "^5.0.4",
+      "electron": "^30.0.1",
+      "electron-builder": "^24.13.3",
+      "naive-ui": "^2.42.0",
+      "typescript": "^5.2.2",
+      "vfonts": "^0.0.3",
+      "vite": "^5.1.6",
+      "vite-plugin-electron": "^0.28.6",
+      "vite-plugin-electron-renderer": "^0.14.5",
+      "vue-tsc": "^2.0.26",
+      "rimraf": "^5.0.10"
+   },
+   "main": "dist-electron/main.js",
+   "files": [
+      "dist-electron",
+      "dist",
+      "dist-py/**"
+   ],
+   "build": {
+      "extraResources": [
+         {
+            "from": "dist-py/",
+            "to": "dist-py",
+            "filter": [
+               "**/*"
+            ]
+         }
+      ],
+      "directories": {
+         "output": "release"
+      }
+   }
+}

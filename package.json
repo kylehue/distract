@@ -6,7 +6,7 @@
    "scripts": {
       "dev": "npm run py:dev && vite",
       "build": "npm run clean && npm run py:build && vue-tsc && vite build && electron-builder",
-      "py:dev": "echo 'Running with system Python (dev mode)'",
+      "py:dev": "if not exist py\\venv (python -m venv py\\venv) && py\\venv\\Scripts\\python -m pip install -r py/requirements.txt",
       "py:build": "py\\venv\\Scripts\\python -m PyInstaller --onefile py/main.py --distpath dist-py --name main",
       "preview": "vite preview",
       "clean": "rimraf dist dist-electron dist-py release"

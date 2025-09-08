@@ -14,3 +14,7 @@ html.dark {
 body {
    overflow: hidden;
 }
+
+#app {
+   padding: 20px;
+}

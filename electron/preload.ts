@@ -26,5 +26,18 @@ contextBridge.exposeInMainWorld("ipcRenderer", {
 });
 
 contextBridge.exposeInMainWorld("api", {
-   add: (a: number, b: number) => ipcRenderer.invoke("py:add", { a, b }),
+   on: (channel: string, cb: (data: any) => void) =>
+      ipcRenderer.on(channel, (_evt, data) => cb(data)),
+   off: (channel: string, listener: (...args: any[]) => void) => {
+      ipcRenderer.removeListener(channel, listener);
+   },
+   // Request/response
+   invoke: (type: string, payload: any) => {
+      const correlationId = Date.now() + Math.random().toString(16);
+      return ipcRenderer.invoke("py:invoke", {
+         type,
+         correlationId,
+         ...payload,
+      });
+   },
 });

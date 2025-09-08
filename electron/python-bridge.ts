@@ -1,11 +1,17 @@
-import { ipcMain } from "electron";
+import { BrowserWindow, ipcMain } from "electron";
 import { spawn, ChildProcessWithoutNullStreams } from "node:child_process";
 import path from "node:path";
 
 const isDev = process.env.NODE_ENV === "development";
 
 // In dev → run Python script
-const PY_DEV_CMD = process.platform === "win32" ? "python" : "python3";
+const PY_DEV_CMD = path.join(
+   process.cwd(),
+   "py",
+   "venv",
+   "Scripts",
+   "python.exe"
+);
 const PY_DEV_SCRIPT = path.join(process.cwd(), "py", "main.py");
 
 // In prod → run frozen exe
@@ -14,17 +20,13 @@ const PY_PROD_PATH = path.join(process.resourcesPath, "dist-py", "main.exe");
 let pyProc: ChildProcessWithoutNullStreams | null = null;
 
 export function startPython() {
-   if (pyProc) return; // already running
+   if (pyProc) return pyProc; // already running
 
    if (isDev) {
       pyProc = spawn(PY_DEV_CMD, [PY_DEV_SCRIPT]);
    } else {
       pyProc = spawn(PY_PROD_PATH, []);
    }
-
-   pyProc.stdout.on("data", (data) => {
-      console.log("[python stdout]", data.toString());
-   });
 
    pyProc.stderr.on("data", (data) => {
       console.error("[python stderr]", data.toString());
@@ -34,6 +36,8 @@ export function startPython() {
       console.log(`Python exited with code ${code}`);
       pyProc = null;
    });
+
+   return pyProc;
 }
 
 export function stopPython() {
@@ -49,20 +53,38 @@ function sendToPython(msg: any) {
    pyProc.stdin.write(JSON.stringify(msg) + "\n");
 }
 
-export function registerPythonHandlers() {
-   startPython();
+export function setupPythonBridge(mainWindow: BrowserWindow) {
+   let pyProc = startPython();
 
-   // Example handler for "add"
-   ipcMain.handle("py:add", async (_evt, { a, b }) => {
-      return new Promise<number>((resolve, reject) => {
+   pyProc.stdout.on("data", (data) => {
+      const lines = data.toString().trim().split("\n");
+      for (const line of lines) {
+         try {
+            const msg = JSON.parse(line);
+
+            if (msg.type) {
+               // 🚀 generic forwarding:
+               mainWindow.webContents.send(`py:${msg.type}`, msg);
+            } else {
+               console.log("[python stdout]", msg);
+            }
+         } catch (err) {
+            console.log("[python raw]", line);
+         }
+      }
+   });
+
+   // Generic request/response
+   ipcMain.handle("py:invoke", async (_evt, payload) => {
+      return new Promise<any>((resolve, reject) => {
          if (!pyProc) return reject("Python not running");
 
          const listener = (data: Buffer) => {
             try {
                const msg = JSON.parse(data.toString());
-               if (msg.type === "add_result") {
+               if (msg.correlationId === payload.correlationId) {
                   resolve(msg.value);
-                  pyProc?.stdout.off("data", listener); // remove listener after response
+                  pyProc?.stdout.off("data", listener);
                }
             } catch (err) {
                reject(err);
@@ -70,8 +92,7 @@ export function registerPythonHandlers() {
          };
 
          pyProc.stdout.on("data", listener);
-
-         sendToPython({ type: "add", a, b });
+         sendToPython(payload);
       });
    });
 }

@@ -2,10 +2,11 @@ import { app, BrowserWindow, ipcMain } from "electron";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
-import { registerPythonHandlers, stopPython } from "./python-bridge";
+import { setupPythonBridge, stopPython } from "./python-bridge";
 
 const require = createRequire(import.meta.url);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const IS_DEV = process.env.NODE_ENV === "development";
 
 process.env.APP_ROOT = path.join(__dirname, "..");
 
@@ -27,9 +28,20 @@ function createWindow() {
          preload: path.join(__dirname, "preload.mjs"),
          contextIsolation: true,
          nodeIntegration: false,
+         devTools: IS_DEV,
       },
       autoHideMenuBar: true,
+      width: 600,
+      height: 400,
+      title: "DISTRACT (Student Client)",
+      darkTheme: true,
    });
+
+   win.removeMenu();
+
+   if (IS_DEV) {
+      win.webContents.openDevTools({ mode: "detach" });
+   }
 
    // Test active push message to Renderer-process.
    win.webContents.on("did-finish-load", () => {
@@ -46,6 +58,8 @@ function createWindow() {
       // Prod mode → load from app.asar/dist/index.html
       win.loadFile(path.join(__dirname, "../dist/index.html"));
    }
+
+   return win;
 }
 
 // Quit when all windows are closed, except on macOS. There, it's common
@@ -67,8 +81,8 @@ app.on("activate", () => {
 });
 
 app.whenReady().then(() => {
-   createWindow();
-   registerPythonHandlers();
+   let win = createWindow();
+   setupPythonBridge(win);
 });
 
 app.on("before-quit", () => {

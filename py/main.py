@@ -1,15 +1,20 @@
 import sys, json
+import monitor
 
 
 def handle_message(msg):
     if msg["type"] == "add":
         a = int(msg["a"])
         b = int(msg["b"])
-        return {"type": "add_result", "value": a + b}
+        return {
+            "value": a + b,
+            "correlationId": msg["correlationId"],
+        }
     return {"type": "error", "message": "unknown type"}
 
 
 def main():
+    monitor.startMonitoring()
     for line in sys.stdin:
         try:
             msg = json.loads(line.strip())

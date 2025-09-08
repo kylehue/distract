@@ -25,6 +25,8 @@ declare namespace NodeJS {
 interface Window {
    ipcRenderer: import("electron").IpcRenderer;
    api: {
-      add: (a: number, b: number) => Promise<number>;
+      on: (channel: string, cb: (data: any) => void) => void;
+      off: (channel: string, listener: (...args: any[]) => void) => void;
+      invoke: (type: string, payload: any) => Promise<any>;
    };
 }

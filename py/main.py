@@ -14,7 +14,6 @@ def handle_message(msg):
 
 
 def main():
-    monitor.startMonitoring()
     for line in sys.stdin:
         try:
             msg = json.loads(line.strip())

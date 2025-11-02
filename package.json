@@ -4,9 +4,9 @@
    "version": "0.0.0",
    "type": "module",
    "scripts": {
-      "dev": "npm run py:dev && vite",
+      "dev": "concurrently \"vite\" \"npm:py:dev\"",
       "build": "npm run clean && npm run py:build && vue-tsc && vite build && electron-builder",
-      "py:dev": "if not exist py\\venv (python -m venv py\\venv) && py\\venv\\Scripts\\python -m pip install -r py/requirements.txt",
+      "py:dev": "(if not exist py\\venv (python -m venv py\\venv)) && py\\venv\\Scripts\\python -m pip install -r py/requirements.txt && py\\venv\\Scripts\\python py/main.py",
       "py:build": "py\\venv\\Scripts\\python -m PyInstaller --onefile py/main.py --distpath dist-py --name main",
       "preview": "vite preview",
       "clean": "rimraf dist dist-electron dist-py release"
@@ -20,6 +20,7 @@
    },
    "devDependencies": {
       "@vitejs/plugin-vue": "^5.0.4",
+      "concurrently": "^9.2.1",
       "electron": "^30.0.1",
       "electron-builder": "^24.13.3",
       "naive-ui": "^2.42.0",

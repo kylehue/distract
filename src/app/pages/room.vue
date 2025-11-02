@@ -43,6 +43,12 @@ const monitorData = ref("");
 (window as any).isBeingMonitored = isBeingMonitored;
 
 onMounted(() => {
+   console.log(34);
+
+   window.api.invoke("add", { a: 1, b: 2 }).then((result: any) => {
+      console.log("Add result:", result);
+   });
+
    const listener = (data: any) => {
       monitorData.value =
          "yaw: " +

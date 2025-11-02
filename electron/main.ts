@@ -37,7 +37,7 @@ function createWindow() {
       darkTheme: true,
    });
 
-   win.removeMenu();
+   // win.removeMenu();
 
    if (IS_DEV) {
       win.webContents.openDevTools({ mode: "detach" });

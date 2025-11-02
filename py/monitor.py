@@ -1,199 +1,247 @@
 # monitor.py
-import cv2
-import mediapipe as mp
-import numpy as np
 import threading
-import time
-import json
+import cv2
+import numpy as np
+import joblib
+from detectors.face import detect_faces
+from detectors.face_mesh import detect_face_mesh
+from detectors.hand import detect_hands
+from detectors.phone import detect_phone
+from detectors.derived.head_pose import detect_head_pose
+from detectors.derived.eye_gaze import detect_eye_gaze
+from sklearn.preprocessing import LabelEncoder
 
-mp_face_mesh = mp.solutions.face_mesh
-face_mesh = mp_face_mesh.FaceMesh(
-    max_num_faces=1,
-    refine_landmarks=True,
-    min_detection_confidence=0.5,
-    min_tracking_confidence=0.5,
+# Load models
+RF_MODEL_PATH = "models/random_forest_model.pkl"
+IF_MODEL_PATH = "models/isolation_forest_model.pkl"
+
+rf_model = joblib.load(RF_MODEL_PATH)
+if_model = joblib.load(IF_MODEL_PATH)
+
+# Global variables for monitoring
+monitoring = False
+monitor_thread = None
+cap = None
+monitor_callback = None
+
+# Pre-fit label encoders
+head_pose_le = LabelEncoder()
+gaze_dir_le = LabelEncoder()
+head_pose_le.fit(["forward", "left", "right", "down"])
+gaze_dir_le.fit(
+    [
+        "center",
+        "top",
+        "bottom",
+        "left",
+        "right",
+        "top_left",
+        "top_right",
+        "bottom_left",
+        "bottom_right",
+    ]
 )
 
-# ---------- landmark indices ----------
-IDX_NOSE_TIP = 1
-IDX_CHIN = 199
-IDX_L_EYE_OUT = 33
-IDX_R_EYE_IN = 263
-IDX_L_MOUTH = 61
-IDX_R_MOUTH = 291
 
-L_IRIS_CENTER = 468
-R_IRIS_CENTER = 473
-L_EYE_LEFT, L_EYE_RIGHT, L_EYE_TOP, L_EYE_BOTTOM = 33, 133, 159, 145
-R_EYE_LEFT, R_EYE_RIGHT, R_EYE_TOP, R_EYE_BOTTOM = 362, 263, 386, 374
+def extract_features(frame):
+    """Extract all required features from frame with preprocessing"""
+    features = {}
 
+    # --- Faces ---
+    faces = detect_faces(frame)
+    if faces:
+        face = faces[0]
+        features["face_present"] = 1
+        features["no_of_face"] = len(faces)
+        features["face_x"] = face["x"]
+        features["face_y"] = face["y"]
+        features["face_w"] = face["w"]
+        features["face_h"] = face["h"]
+        features["face_conf"] = face["confidence"]
+    else:
+        features["face_present"] = 0
+        features["no_of_face"] = 0
+        features.update(
+            {k: 0 for k in ["face_x", "face_y", "face_w", "face_h", "face_conf"]}
+        )
 
-# ---------- helpers ----------
-def to_px(lm, w, h):
-    return np.array([lm.x * w, lm.y * h], dtype=np.float64)
+    # --- Face mesh ---
+    mesh = detect_face_mesh(frame)
+    keypoints = mesh["keypoints"]
+    features["left_eye_x"], features["left_eye_y"] = (
+        keypoints["left_eye"][:2] if keypoints["left_eye"] else (0, 0)
+    )
+    features["right_eye_x"], features["right_eye_y"] = (
+        keypoints["right_eye"][:2] if keypoints["right_eye"] else (0, 0)
+    )
+    features["nose_tip_x"], features["nose_tip_y"] = (
+        keypoints["nose_tip"][:2] if keypoints["nose_tip"] else (0, 0)
+    )
+    features["mouth_x"], features["mouth_y"] = (
+        keypoints["mouth"][:2] if keypoints["mouth"] else (0, 0)
+    )
 
-
-def clamp(x, lo=-1.0, hi=1.0):
-    return max(lo, min(hi, x))
-
-
-class Smoother:
-    def __init__(self, alpha=0.35):
-        self.alpha = alpha
-        self.val = None
-
-    def __call__(self, new):
-        new = np.array(new, dtype=np.float64)
-        if self.val is None:
-            self.val = new
+    # --- Hands ---
+    hands = detect_hands(frame)
+    features["hand_count"] = len(hands["hand_points"])
+    if hands["hand_points"]:
+        lh = hands["hand_points"][0]
+        features["left_hand_x"], features["left_hand_y"] = lh[0] if lh else (0, 0)
+        if len(hands["hand_points"]) > 1:
+            rh = hands["hand_points"][1]
+            features["right_hand_x"], features["right_hand_y"] = rh[0] if rh else (0, 0)
         else:
-            self.val = self.alpha * new + (1 - self.alpha) * self.val
-        return self.val
+            features["right_hand_x"], features["right_hand_y"] = 0, 0
+    else:
+        features.update(
+            {"left_hand_x": 0, "left_hand_y": 0, "right_hand_x": 0, "right_hand_y": 0}
+        )
 
+    features["hand_obj_interaction"] = 0  # Placeholder
 
-gaze_smoother_L = Smoother()
-gaze_smoother_R = Smoother()
-
-
-def eye_gaze_norm(landmarks, w, h, iris_idx, left_idx, right_idx, top_idx, bot_idx):
-    iris = to_px(landmarks[iris_idx], w, h)
-    left = to_px(landmarks[left_idx], w, h)
-    right = to_px(landmarks[right_idx], w, h)
-    top = to_px(landmarks[top_idx], w, h)
-    bot = to_px(landmarks[bot_idx], w, h)
-
-    center = (left + right) / 2.0
-    eye_w = np.linalg.norm(right - left) + 1e-6
-    eye_h = np.linalg.norm(bot - top) + 1e-6
-
-    gx = clamp((iris[0] - center[0]) / (eye_w / 2.0))
-    gy = clamp((iris[1] - center[1]) / (eye_h / 2.0))
-    return iris, (gx, gy)
-
-
-def head_pose_euler(landmarks, w, h):
-    nose = to_px(landmarks[IDX_NOSE_TIP], w, h)
-    chin = to_px(landmarks[IDX_CHIN], w, h)
-    leftEye = to_px(landmarks[IDX_L_EYE_OUT], w, h)
-    rightEye = to_px(landmarks[IDX_R_EYE_IN], w, h)
-    leftM = to_px(landmarks[IDX_L_MOUTH], w, h)
-    rightM = to_px(landmarks[IDX_R_MOUTH], w, h)
-
-    image_points = np.array(
-        [nose, chin, leftEye, rightEye, leftM, rightM], dtype=np.float64
-    )
-    model_points = np.array(
-        [
-            (0.0, 0.0, 0.0),
-            (0.0, -63.6, -12.5),
-            (-43.3, 32.7, -26.0),
-            (43.3, 32.7, -26.0),
-            (-28.9, -28.9, -24.1),
-            (28.9, -28.9, -24.1),
-        ],
-        dtype=np.float64,
-    )
-
-    cam_matrix = np.array([[w, 0, w / 2], [0, w, h / 2], [0, 0, 1]], dtype=np.float64)
-    dist_coeffs = np.zeros((4, 1), dtype=np.float64)
-
-    ok, rvec, tvec = cv2.solvePnP(
-        model_points,
-        image_points,
-        cam_matrix,
-        dist_coeffs,
-        flags=cv2.SOLVEPNP_ITERATIVE,
-    )
-    if not ok:
-        return (0, 0, 0), nose
-
-    rmat, _ = cv2.Rodrigues(rvec)
-    angles, _, _, _, _, _ = cv2.RQDecomp3x3(rmat)
-    pitch = float(angles[0])
-    yaw = float(angles[1])
-    roll = float(angles[2])
-    return (pitch, yaw, roll), nose
-
-
-# ---------- monitoring ----------
-running = False
-thread = None
-
-
-def loop():
-    global running
-    cap = cv2.VideoCapture(0)
-    while running:
-        ok, frame = cap.read()
-        if not ok:
-            continue
-        frame = cv2.flip(frame, 1)
-        h, w = frame.shape[:2]
-
-        rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        results = face_mesh.process(rgb)
-        if results.multi_face_landmarks:
-            lms = results.multi_face_landmarks[0].landmark
-
-            (yaw, pitch, roll), nose_px = head_pose_euler(lms, w, h)
-            head_x = clamp((nose_px[0] - w / 2) / (w / 2))
-            head_y = clamp((nose_px[1] - h / 2) / (h / 2))
-
-            L_iris, L_gaze = eye_gaze_norm(
-                lms,
-                w,
-                h,
-                L_IRIS_CENTER,
-                L_EYE_LEFT,
-                L_EYE_RIGHT,
-                L_EYE_TOP,
-                L_EYE_BOTTOM,
-            )
-            R_iris, R_gaze = eye_gaze_norm(
-                lms,
-                w,
-                h,
-                R_IRIS_CENTER,
-                R_EYE_LEFT,
-                R_EYE_RIGHT,
-                R_EYE_TOP,
-                R_EYE_BOTTOM,
-            )
-
-            L_gaze = gaze_smoother_L(L_gaze)
-            R_gaze = gaze_smoother_R(R_gaze)
-
-            data = {
-                "type": "monitoring_data",
-                "yaw": yaw,
-                "pitch": pitch,
-                "roll": roll,
-                "head_x": float(head_x),
-                "head_y": float(head_y),
-                "gaze_left_x": float(L_gaze[0]),
-                "gaze_left_y": float(L_gaze[1]),
-                "gaze_right_x": float(R_gaze[0]),
-                "gaze_right_y": float(R_gaze[1]),
-                "timestamp": time.time(),
+    # --- Head pose ---
+    if mesh["mesh_points"]:
+        head_pose = detect_head_pose(mesh["mesh_points"], frame.shape)
+        orientation = head_pose["orientation"]
+        # Treat "up" as "forward" for encoding
+        if orientation == "up":
+            orientation_enc = "forward"
+        else:
+            orientation_enc = orientation
+        features["head_pose"] = head_pose_le.transform([orientation_enc])[0]
+        features["head_pitch"] = head_pose["pitch"]
+        features["head_yaw"] = head_pose["yaw"]
+        features["head_roll"] = head_pose["roll"]
+    else:
+        features.update(
+            {
+                "head_pose": head_pose_le.transform(["forward"])[0],
+                "head_pitch": 0.5,
+                "head_yaw": 0.5,
+                "head_roll": 0.5,
             }
-            print(json.dumps(data), flush=True)
+        )
 
-        time.sleep(0.05)  # 20Hz
+    # --- Phone ---
+    phones = detect_phone(frame)
+    if phones:
+        phone = phones[0]
+        features["phone_present"] = 1
+        features["phone_loc_x"] = phone["x"]
+        features["phone_loc_y"] = phone["y"]
+        features["phone_conf"] = phone["confidence"]
+    else:
+        features.update(
+            {"phone_present": 0, "phone_loc_x": 0, "phone_loc_y": 0, "phone_conf": 0}
+        )
+
+    # --- Eye gaze ---
+    if mesh["mesh_points"]:
+        gaze = detect_eye_gaze(mesh["mesh_points"], frame.shape)
+        features["gaze_direction"] = gaze_dir_le.transform([gaze["gaze_direction"]])[0]
+        features["gazePoint_x"], features["gazePoint_y"] = gaze["gaze_point"]
+        features["pupil_left_x"], features["pupil_left_y"] = (
+            keypoints["pupil_left"][:2] if keypoints["pupil_left"] else (0, 0)
+        )
+        features["pupil_right_x"], features["pupil_right_y"] = (
+            keypoints["pupil_right"][:2] if keypoints["pupil_right"] else (0, 0)
+        )
+    else:
+        features.update(
+            {
+                "gaze_direction": gaze_dir_le.transform(["center"])[0],
+                "gazePoint_x": 0.5,
+                "gazePoint_y": 0.5,
+                "pupil_left_x": 0,
+                "pupil_left_y": 0,
+                "pupil_right_x": 0,
+                "pupil_right_y": 0,
+            }
+        )
+
+    return features
+
+
+def monitor_loop():
+    global monitoring, cap, monitor_callback
+    while monitoring:
+        ret, frame = cap.read()
+        if not ret:
+            continue
+
+        features = extract_features(frame)
+
+        # Build feature vector for models
+        feature_vector = np.array(
+            [v if isinstance(v, (int, float)) else 0 for v in features.values()],
+            dtype=np.float32,
+        ).reshape(1, -1)
+
+        # Random Forest score
+        try:
+            rf_score = rf_model.predict_proba(feature_vector)[0, 1]
+        except Exception:
+            rf_score = 0.0
+
+        # Isolation Forest anomaly score
+        try:
+            if_score = if_model.score_samples(feature_vector)[0]
+            if_score = 1 / (1 + np.exp(-if_score))  # map to 0-1
+        except Exception:
+            if_score = 0.0
+
+        # Call callback with frame
+        if monitor_callback:
+            monitor_callback(frame, features, rf_score, if_score)
+
+        # Overlay
+        overlay_text = [
+            f"RF Score: {rf_score:.4f}",
+            f"IF Score: {if_score:.4f}",
+            f"Gaze Dir: {features['gaze_direction']}",
+        ]
+        x, y = 20, frame.shape[0] - 90
+        for i, text in enumerate(overlay_text):
+            cv2.putText(
+                frame,
+                text,
+                (x, y + i * 25),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.7,
+                (0, 255, 0),
+                1,
+                cv2.LINE_AA,
+            )
+
+        # Draw gaze point
+        gx = int(features["gazePoint_x"] * frame.shape[1])
+        gy = int(features["gazePoint_y"] * frame.shape[0])
+        cv2.circle(frame, (gx, gy), 5, (0, 0, 255), -1)
+
+        cv2.imshow("Monitoring", frame)
+        if cv2.waitKey(1) & 0xFF == ord("q"):
+            monitoring = False
+            break
 
     cap.release()
+    cv2.destroyAllWindows()
 
 
-def startMonitoring():
-    global running, thread
-    if running:
+def startMonitoring(callback=None):
+    """Start monitoring in a separate thread. Optional callback(features, rf_score, if_score)"""
+    global monitoring, cap, monitor_thread, monitor_callback
+    if monitoring:
         return
-    running = True
-    thread = threading.Thread(target=loop, daemon=True)
-    thread.start()
+    monitor_callback = callback
+    cap = cv2.VideoCapture(0)
+    if not cap.isOpened():
+        raise RuntimeError("Cannot access webcam.")
+    monitoring = True
+    monitor_thread = threading.Thread(target=monitor_loop, daemon=True)
+    monitor_thread.start()
 
 
 def endMonitoring():
-    global running
-    running = False
-    if thread is not None:
-        thread.join()
+    """Stop monitoring"""
+    global monitoring
+    monitoring = False

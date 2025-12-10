@@ -3,7 +3,7 @@
       <div class="flex">
          <div class="flex flex-col">
             <NText class="text-xs" depth="3">Host</NText>
-            <NText>Ms. Alice Bobbystone</NText>
+            <NText>{{ store.hostName }}</NText>
          </div>
       </div>
       <div class="flex flex-1 items-center justify-center">
@@ -20,10 +20,11 @@
       </div>
       <div class="flex justify-end">
          <NButton
-            @click="router.push('/')"
+            @click="leaveRoom"
             type="error"
             secondary
             :disabled="isBeingMonitored"
+            :loading="isLeaveRoomLoading"
          >
             Leave room
          </NButton>
@@ -32,38 +33,67 @@
 </template>
 
 <script setup lang="ts">
-import "vfonts/Inter.css";
-import { NButton, NStatistic, NText } from "naive-ui";
-import { onBeforeUnmount, onMounted, ref } from "vue";
+import { NButton, NText } from "naive-ui";
+import { ref } from "vue";
 import { useRouter } from "vue-router";
+import { useSocket } from "@/composables/use-socket";
+import { useStore } from "@/composables/use-store";
+import { getUserId } from "@/lib/user-id";
+
 const router = useRouter();
-const isBeingMonitored = ref(false);
+const socket = useSocket();
+const store = useStore();
 const monitorData = ref("");
+const isBeingMonitored = ref(false);
+const isLeaveRoomLoading = ref(false);
 
-(window as any).isBeingMonitored = isBeingMonitored;
-
-onMounted(() => {
-   console.log(34);
-
-   window.api.invoke("add", { a: 1, b: 2 }).then((result: any) => {
-      console.log("Add result:", result);
-   });
-
-   const listener = (data: any) => {
-      monitorData.value =
-         "yaw: " +
-         data.yaw.toFixed(2) +
-         ", pitch: " +
-         data.pitch.toFixed(2) +
-         ", roll: " +
-         data.roll.toFixed(2);
-      isBeingMonitored.value = true;
-   };
-
-   window.api.on("py:monitoring_data", listener);
-
-   onBeforeUnmount(() => {
-      window.api.off("py:monitoring_data", listener);
-   });
+socket.on("start_monitoring", () => {
+   window.api.invoke("start_monitoring", {});
+   isBeingMonitored.value = true;
 });
+
+socket.on("stop_monitoring", () => {
+   window.api.invoke("stop_monitoring", {});
+   isBeingMonitored.value = false;
+});
+
+function leaveRoom() {
+   isLeaveRoomLoading.value = true;
+   socket.emit("leave_room", { userId: getUserId() });
+}
+
+socket.on("leave_room_success", () => {
+   isLeaveRoomLoading.value = false;
+   isBeingMonitored.value = false;
+   window.api.invoke("stop_monitoring", {});
+   store.clearRoom();
+   router.push("/");
+});
+
+// watch(
+//    isBeingMonitored,
+//    (newVal) => {
+//       console.log("monitoring:", newVal);
+
+//       if (newVal) {
+//          window.api.invoke("start_monitoring", {});
+//       } else {
+//          window.api.invoke("stop_monitoring", {});
+//       }
+//    },
+//    { immediate: true }
+// );
+
+// onMounted(() => {
+//    console.log(34);
+//    const listener = (data: any) => {
+//       console.log("data:", data);
+//    };
+
+//    window.api.on("py:monitoring_data", listener);
+
+//    onBeforeUnmount(() => {
+//       window.api.off("py:monitoring_data", listener);
+//    });
+// });
 </script>

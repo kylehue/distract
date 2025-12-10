@@ -1,4 +1,3 @@
-# eye_gaze_test.py
 import cv2
 import numpy as np
 from detectors.face_mesh import detect_face_mesh
@@ -66,6 +65,7 @@ def main():
         if not ret:
             break
 
+        frame = cv2.flip(frame, 1)
         frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         mesh_results = detect_face_mesh(frame_rgb)
 

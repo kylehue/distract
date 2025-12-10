@@ -13,7 +13,7 @@ while True:
 
     h, w, _ = frame.shape
 
-    # Detect phones (normalized)
+    frame = cv2.flip(frame, 1)
     phones = detect_phone(frame)
 
     for phone in phones:

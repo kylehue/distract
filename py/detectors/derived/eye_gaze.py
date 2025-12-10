@@ -1,6 +1,5 @@
-# eye_gaze.py
 import numpy as np
-import cv2
+from utils.math import map_value
 
 # Landmark indices for iris and eyes (MediaPipe FaceMesh)
 L_IRIS_CENTER = 468
@@ -17,6 +16,7 @@ def _to_px(lm, w, h):
         return np.array([lm[0] * w, lm[1] * h], dtype=np.float64)
 
 
+# (COPY PASTED FROM GOOGLE COLAB)
 def _eye_gaze(landmarks, w, h, iris_idx, left_idx, right_idx, top_idx, bot_idx):
     """Return normalized gaze relative to eye bounding box (-1..1), safely."""
     try:
@@ -42,7 +42,7 @@ def detect_eye_gaze(
     landmarks,
     frame_shape,
     shift_x=0.0,
-    shift_y=0.15,
+    shift_y=0.0,  # slight downward shift to account for typical screen position (depends on camera position but they're usually above screen)
 ):
     """
     Compute eye gaze estimates.
@@ -64,9 +64,13 @@ def detect_eye_gaze(
     gx = (gx_L + gx_R) / 2.0
     gy = (gy_L + gy_R) / 2.0
 
-    # Map gaze to screen coordinates
+    # Map gaze
     gaze_x = 0.5 + gx / 2.0 + shift_x
     gaze_y = 0.5 + gy / 2.0 + shift_y
+
+    # Remap to 0-1 range based on empirical bounds (these may need adjustment per setup)
+    gaze_x = map_value(gaze_x, 0.2, 0.8, 0.0, 1.0)
+    gaze_y = map_value(gaze_y, 0.1, 0.5, 0.0, 1.0)
 
     # Determine categorical gaze_direction
     dirs = []

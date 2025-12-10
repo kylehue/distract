@@ -1,16 +1,13 @@
 import sys, json
-import monitor
+from monitor import start_monitoring, stop_monitoring
 
 
 def handle_message(msg):
-    if msg["type"] == "add":
-        a = int(msg["a"])
-        b = int(msg["b"])
-        return {
-            "value": a + b,
-            "correlationId": msg["correlationId"],
-        }
-    return {"type": "error", "message": "unknown type"}
+    if msg["type"] == "start_monitoring":
+        start_monitoring()
+    if msg["type"] == "stop_monitoring":
+        stop_monitoring()
+    return {"type": "error", "data": "unknown type"}
 
 
 def main():
@@ -20,7 +17,7 @@ def main():
             result = handle_message(msg)
             print(json.dumps(result), flush=True)
         except Exception as e:
-            print(json.dumps({"type": "error", "message": str(e)}), flush=True)
+            print(json.dumps({"type": "error", "data": str(e)}), flush=True)
 
 
 if __name__ == "__main__":

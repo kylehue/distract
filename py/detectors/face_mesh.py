@@ -11,6 +11,7 @@ face_mesh = mp_face_mesh.FaceMesh(
 )
 
 
+# (COPY PASTED FROM GOOGLE COLAB)
 def detect_face_mesh(frame):
     results = face_mesh.process(frame)
 

@@ -1,5 +1,5 @@
 import cv2
-from detectors.face import detect_faces  # your normalized face detector
+from detectors.face import detect_faces
 
 # Initialize webcam
 cap = cv2.VideoCapture(0)
@@ -11,7 +11,7 @@ while True:
     if not ret:
         break
 
-    # Detect faces
+    frame = cv2.flip(frame, 1)
     frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
     faces = detect_faces(frame_rgb)
 

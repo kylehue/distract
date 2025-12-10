@@ -1,6 +1,6 @@
 import cv2
 import mediapipe as mp
-from detectors.hand import detect_hands  # your normalized hand detector
+from detectors.hand import detect_hands
 
 mp_drawing = mp.solutions.drawing_utils
 mp_drawing_styles = mp.solutions.drawing_styles
@@ -15,45 +15,61 @@ while True:
     if not ret:
         break
 
-    # Detect hands
+    frame = cv2.flip(frame, 1)
     frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
     results = detect_hands(frame_rgb)
 
-    hand_landmarks_list = results["multi_hand_landmarks"]
-    handedness_list = results["multi_handedness"]
-
     h, w, _ = frame.shape
 
-    if hand_landmarks_list:
-        for hand_landmarks, label in zip(hand_landmarks_list, handedness_list):
-            # Draw full hand landmarks
-            mp_drawing.draw_landmarks(
-                frame,
-                hand_landmarks,
-                mp.solutions.hands.HAND_CONNECTIONS,
-                mp_drawing_styles.get_default_hand_landmarks_style(),
-                mp_drawing_styles.get_default_hand_connections_style(),
-            )
+    # Draw left hand if detected
+    if results["left_hand_points"]:
+        for x_norm, y_norm in results["left_hand_points"]:
+            cx, cy = int(x_norm * w), int(y_norm * h)
+            cv2.circle(frame, (cx, cy), 2, (0, 255, 0), -1)
 
-            # Get the wrist point (index 0)
-            wrist = hand_landmarks.landmark[0]
-            x, y = int(wrist.x * w), int(wrist.y * h)
+        wx, wy = int(results["wrist_left_x"] * w), int(results["wrist_left_y"] * h)
+        cv2.putText(
+            frame,
+            "Left Hand",
+            (wx - 50, wy - 20),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.8,
+            (0, 255, 0),
+            2,
+        )
 
-            # Draw label text
-            cv2.putText(
-                frame,
-                label,  # already a string like "Left" or "Right"
-                (x - 40, y - 20),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.8,
-                (255, 255, 255),
-                2,
-            )
+    # Draw right hand if detected
+    if results["right_hand_points"]:
+        for x_norm, y_norm in results["right_hand_points"]:
+            cx, cy = int(x_norm * w), int(y_norm * h)
+            cv2.circle(frame, (cx, cy), 2, (0, 0, 255), -1)
+
+        wx, wy = int(results["wrist_right_x"] * w), int(results["wrist_right_y"] * h)
+        cv2.putText(
+            frame,
+            "Right Hand",
+            (wx - 50, wy - 20),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.8,
+            (0, 0, 255),
+            2,
+        )
+
+    # Draw hand count
+    cv2.putText(
+        frame,
+        f"Detected hands: {results['hand_count']}",
+        (20, 40),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.7,
+        (0, 255, 255),
+        2,
+    )
 
     # Show window
     cv2.imshow("Hand Detection", frame)
 
-    # Exit on 'q' or close window
+    # Exit on 'q' or when window is closed
     if cv2.waitKey(1) & 0xFF == ord("q"):
         break
     if cv2.getWindowProperty("Hand Detection", cv2.WND_PROP_VISIBLE) < 1:

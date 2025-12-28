@@ -10,6 +10,14 @@ const baseThemeOverrides: GlobalThemeOverrides = {
       lineHeight: "0px",
       nodeWrapperPadding: "0",
    },
+   Form: {
+      feedbackFontSizeSmall: "0.6em",
+      feedbackFontSizeMedium: "0.8em",
+      feedbackFontSizeLarge: "1em",
+      feedbackHeightSmall: "1.3em",
+      feedbackHeightMedium: "1.5em",
+      feedbackHeightLarge: "1.7em",
+   },
 };
 
 export const lightThemeOverrides: GlobalThemeOverrides = {

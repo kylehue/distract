@@ -4,7 +4,7 @@ import App from "@/app/index.vue";
 import { router } from "@/lib/router";
 import SocketPlugin, { getSocket } from "@/plugins/socket";
 import { getUserId } from "./lib/user-id";
-import { useStore } from "./composables/use-store";
+import { useStore } from "./app/composables/use-store";
 
 const app = createApp(App);
 
@@ -32,7 +32,7 @@ window.api.on("py:monitoring_data", (data) => {
 
    let samples = data.data as number[][];
    console.log("Received monitoring data:", samples);
-   socket.emit("monitoring_data", {
+   socket.emit("student:monitoring_data", {
       userId: userId,
       roomCode: roomCode,
       monitoringData: samples,

@@ -36,8 +36,8 @@
 import { NButton, NText } from "naive-ui";
 import { ref } from "vue";
 import { useRouter } from "vue-router";
-import { useSocket } from "@/composables/use-socket";
-import { useStore } from "@/composables/use-store";
+import { useSocket } from "@/app/composables/use-socket";
+import { useStore } from "@/app/composables/use-store";
 import { getUserId } from "@/lib/user-id";
 
 const router = useRouter();
@@ -47,22 +47,22 @@ const monitorData = ref("");
 const isBeingMonitored = ref(false);
 const isLeaveRoomLoading = ref(false);
 
-socket.on("start_monitoring", () => {
+socket.on("student:start_monitoring", () => {
    window.api.invoke("start_monitoring", {});
    isBeingMonitored.value = true;
 });
 
-socket.on("stop_monitoring", () => {
+socket.on("student:stop_monitoring", () => {
    window.api.invoke("stop_monitoring", {});
    isBeingMonitored.value = false;
 });
 
 function leaveRoom() {
    isLeaveRoomLoading.value = true;
-   socket.emit("leave_room", { userId: getUserId() });
+   socket.emit("student:leave_room", {});
 }
 
-socket.on("leave_room_success", () => {
+socket.on("student:leave_room_success", () => {
    isLeaveRoomLoading.value = false;
    isBeingMonitored.value = false;
    window.api.invoke("stop_monitoring", {});

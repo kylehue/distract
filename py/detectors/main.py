@@ -100,7 +100,7 @@ def prepare_features_for_model(features):
         "face_count",
         "hand_count",
         "face_present",
-        "label",
+        # "label",
     ]
 
     return [features.get(key, 0) for key in desired]

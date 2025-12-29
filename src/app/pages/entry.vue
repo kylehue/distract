@@ -9,8 +9,7 @@
             <NInput
                placeholder="Enter your name"
                v-model:value="studentName"
-               :default-value="store.studentName.value"
-               :disabled="isLoading"
+               :disabled="isJoinRoomLoading"
             >
                <template #prefix>
                   <PhUser />
@@ -25,7 +24,7 @@
             <NInput
                placeholder="Enter the room code"
                v-model:value="roomCode"
-               :disabled="isLoading"
+               :disabled="isJoinRoomLoading"
             >
                <template #prefix>
                   <PhHouseSimple />
@@ -33,9 +32,8 @@
             </NInput>
          </NFormItem>
          <NButton
-            @click="joinRoom"
-            :loading="isLoading"
-            :disabled="!studentName || !roomCode"
+            @click="joinRoom()"
+            :loading="isJoinRoomLoading"
             class="mt-2! w-full!"
          >
             Join room
@@ -49,51 +47,50 @@ import { ref } from "vue";
 import { NButton, NInput, NForm, NFormItem } from "naive-ui";
 import { PhHouseSimple, PhUser } from "@phosphor-icons/vue";
 import { useRouter } from "vue-router";
-import { useSocket } from "@/app/composables/use-socket";
-import { useStore } from "@/app/composables/use-store";
+import { useSocketEvent } from "../composables/use-socket-event";
 
 const router = useRouter();
-const socket = useSocket();
-const store = useStore();
 const studentName = ref("");
 const studentNameStatus = ref<"error" | "success">("success");
 const studentNameFeedback = ref("");
 const roomCode = ref("");
 const roomCodeStatus = ref<"error" | "success">("success");
 const roomCodeFeedback = ref("");
-const isLoading = ref(false);
 
-function joinRoom() {
-   isLoading.value = true;
-   studentNameStatus.value = "success";
-   studentNameFeedback.value = "";
-   roomCodeStatus.value = "success";
-   roomCodeFeedback.value = "";
-   socket.emit("student:join_room", {
+const { execute: joinRoom, isLoading: isJoinRoomLoading } = useSocketEvent({
+   executeEvent: "student:join_room",
+   successEvent: "student:join_room_success",
+   errorEvent: "student:join_room_error",
+   executePayload: () => ({
       studentName: studentName.value,
       roomCode: roomCode.value,
-   });
-}
+   }),
+   onBeforeExecute() {
+      studentNameStatus.value = "success";
+      studentNameFeedback.value = "";
+      roomCodeStatus.value = "success";
+      roomCodeFeedback.value = "";
+      return true;
+   },
+   onSuccess(data) {
+      router.push({
+         path: "/room/" + data.room.code,
+         query: {
+            studentName: data.student.studentName,
+         },
+      });
+   },
+   onError(errorData) {
+      const fieldErrors = errorData.fieldErrors;
+      if (fieldErrors.studentName) {
+         studentNameStatus.value = "error";
+         studentNameFeedback.value = fieldErrors.studentName;
+      }
 
-socket.on("student:join_room_success", (data) => {
-   isLoading.value = false;
-   store.setStudentName(data.studentName);
-   store.setRoomCode(data.roomCode);
-   store.setHostName(data.hostName);
-   router.push("/room");
-});
-
-socket.on("student:join_room_error", (data) => {
-   isLoading.value = false;
-   const fieldErrors = data.fieldErrors;
-   if (fieldErrors.studentName) {
-      studentNameStatus.value = "error";
-      studentNameFeedback.value = fieldErrors.studentName;
-   }
-
-   if (fieldErrors.roomCode) {
-      roomCodeStatus.value = "error";
-      roomCodeFeedback.value = fieldErrors.roomCode;
-   }
+      if (fieldErrors.roomCode) {
+         roomCodeStatus.value = "error";
+         roomCodeFeedback.value = fieldErrors.roomCode;
+      }
+   },
 });
 </script>

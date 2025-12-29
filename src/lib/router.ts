@@ -5,7 +5,7 @@ import RoomPage from "@/app/pages/room.vue";
 const routes: RouteRecordRaw[] = [
    { path: "/", redirect: "/entry" },
    { path: "/entry", component: EntryPage },
-   { path: "/room", component: RoomPage },
+   { path: "/room/:roomCode", component: RoomPage },
 ];
 
 const router = createRouter({

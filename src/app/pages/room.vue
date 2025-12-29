@@ -1,15 +1,28 @@
 <template>
-   <div class="flex flex-col w-full h-full">
+   <div
+      v-if="isJoinRoomLoading"
+      class="flex items-center justify-center w-full h-full"
+   >
+      <div class="flex items-center gap-2">
+         <NSpin />
+         <NText>Loading...</NText>
+      </div>
+   </div>
+   <template v-else-if="!roomInfo">Room not found</template>
+   <div v-else class="flex flex-col w-full h-full">
       <div class="flex">
          <div class="flex flex-col">
             <NText class="text-xs" depth="3">Host</NText>
-            <NText>{{ store.hostName }}</NText>
+            <NText>{{ roomInfo.teacherId }}</NText>
          </div>
       </div>
       <div class="flex flex-1 items-center justify-center">
-         <NText class="text-lg" :type="isBeingMonitored ? 'error' : 'default'">
+         <NText
+            class="text-lg"
+            :type="roomInfo.status === 'monitoring' ? 'error' : 'default'"
+         >
             {{
-               isBeingMonitored
+               roomInfo.status === "monitoring"
                   ? "You are currently being monitored."
                   : "The teacher hasn't started monitoring yet."
             }}
@@ -20,10 +33,10 @@
       </div>
       <div class="flex justify-end">
          <NButton
-            @click="leaveRoom"
+            @click="leaveRoom()"
             type="error"
             secondary
-            :disabled="isBeingMonitored"
+            :disabled="roomInfo.status === 'monitoring'"
             :loading="isLeaveRoomLoading"
          >
             Leave room
@@ -33,66 +46,68 @@
 </template>
 
 <script setup lang="ts">
-import { NButton, NText } from "naive-ui";
-import { ref } from "vue";
-import { useRouter } from "vue-router";
+import { NButton, NSpin, NText, useMessage } from "naive-ui";
+import { onUnmounted, ref, watch } from "vue";
+import { useRoute, useRouter } from "vue-router";
 import { useSocket } from "@/app/composables/use-socket";
-import { useStore } from "@/app/composables/use-store";
+import { useSocketEvent } from "../composables/use-socket-event";
+import { RoomInfo } from "@/lib/typings";
 
 const router = useRouter();
+const route = useRoute();
 const socket = useSocket();
-const store = useStore();
+const message = useMessage();
 const monitorData = ref("");
-const isBeingMonitored = ref(false);
-const isLeaveRoomLoading = ref(false);
+const roomInfo = ref<RoomInfo>();
 
-socket.on("student:start_monitoring", () => {
-   window.api.invoke("start_monitoring", {});
-   isBeingMonitored.value = true;
+const { execute: joinRoom, isLoading: isJoinRoomLoading } = useSocketEvent({
+   executeEvent: "student:join_room",
+   successEvent: "student:join_room_success",
+   errorEvent: "student:join_room_error",
+   executeImmediately: true,
+   executePayload: () => ({
+      roomCode: route.params.roomCode,
+      studentName: route.query.studentName,
+   }),
+   onSuccess(data) {
+      roomInfo.value = data.room;
+   },
+   onError(errorData) {
+      router.push("/");
+      message.error(
+         errorData.message || "Failed to join the room. Please try again."
+      );
+   },
 });
 
-socket.on("student:stop_monitoring", () => {
-   window.api.invoke("stop_monitoring", {});
-   isBeingMonitored.value = false;
+const { execute: leaveRoom, isLoading: isLeaveRoomLoading } = useSocketEvent({
+   successEvent: "student:leave_room_success",
+   executeEvent: "student:leave_room",
+   onSuccess() {
+      window.api.invoke("stop_monitoring", {});
+      router.push("/");
+   },
 });
 
-function leaveRoom() {
-   isLeaveRoomLoading.value = true;
-   socket.emit("student:leave_room", {});
-}
-
-socket.on("student:leave_room_success", () => {
-   isLeaveRoomLoading.value = false;
-   isBeingMonitored.value = false;
-   window.api.invoke("stop_monitoring", {});
-   store.clearRoom();
-   router.push("/");
+// on reconnect
+socket.on("connect", () => {
+   console.log("Rejoining room...");
+   joinRoom();
 });
 
-// watch(
-//    isBeingMonitored,
-//    (newVal) => {
-//       console.log("monitoring:", newVal);
+socket.on("student:room_update", (data) => {
+   roomInfo.value = data.room as RoomInfo;
+});
 
-//       if (newVal) {
-//          window.api.invoke("start_monitoring", {});
-//       } else {
-//          window.api.invoke("stop_monitoring", {});
-//       }
-//    },
-//    { immediate: true }
-// );
-
-// onMounted(() => {
-//    console.log(34);
-//    const listener = (data: any) => {
-//       console.log("data:", data);
-//    };
-
-//    window.api.on("py:monitoring_data", listener);
-
-//    onBeforeUnmount(() => {
-//       window.api.off("py:monitoring_data", listener);
-//    });
-// });
+watch(
+   roomInfo,
+   (newVal) => {
+      if (newVal && newVal.status === "monitoring") {
+         window.api.invoke("start_monitoring", {});
+      } else {
+         window.api.invoke("stop_monitoring", {});
+      }
+   },
+   { immediate: true }
+);
 </script>

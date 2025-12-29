@@ -20,7 +20,7 @@ export function useSocket() {
       }
    }
 
-   async function emit(event: string, data: Record<any, any>) {
+   async function emit(event: string, data: Record<any, any> = {}) {
       data["uuid"] = await getUuid();
       socket.emit(event, data);
 

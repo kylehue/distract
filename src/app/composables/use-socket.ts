@@ -1,6 +1,6 @@
-import { onBeforeUnmount, unref } from "vue";
+import { onBeforeUnmount, ref, unref } from "vue";
 import { getSocket } from "@/plugins/socket";
-import { getUserId } from "@/lib/user-id";
+import { getUuid } from "@/lib/uuid";
 
 export function useSocket() {
    const socket = getSocket();
@@ -20,8 +20,8 @@ export function useSocket() {
       }
    }
 
-   function emit(event: string, data: Record<any, any>) {
-      data["uuid"] = getUserId();
+   async function emit(event: string, data: Record<any, any>) {
+      data["uuid"] = await getUuid();
       socket.emit(event, data);
 
       // dev logging

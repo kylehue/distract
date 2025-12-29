@@ -1,7 +1,8 @@
-import { app, BrowserWindow, ipcMain } from "electron";
+import { app, BrowserWindow } from "electron";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { setupPythonBridge, stopPython } from "./python-bridge";
+import { setupUuid } from "./uuid";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const IS_DEV = process.env.NODE_ENV === "development";
@@ -93,6 +94,7 @@ if (!gotTheLock) {
    app.whenReady().then(() => {
       win = createWindow();
       setupPythonBridge(win);
+      setupUuid();
    });
 
    app.on("before-quit", () => {

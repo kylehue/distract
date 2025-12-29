@@ -28,5 +28,6 @@ interface Window {
       on: (channel: string, cb: (data: any) => void) => void;
       off: (channel: string, listener: (...args: any[]) => void) => void;
       invoke: (type: string, payload: any) => Promise<any>;
+      getUuid: () => Promise<string>;
    };
 }

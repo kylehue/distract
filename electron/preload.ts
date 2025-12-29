@@ -31,7 +31,6 @@ contextBridge.exposeInMainWorld("api", {
    off: (channel: string, listener: (...args: any[]) => void) => {
       ipcRenderer.removeListener(channel, listener);
    },
-   // Request/response
    invoke: (type: string, payload: any) => {
       const correlationId = Date.now() + Math.random().toString(16);
       return ipcRenderer.invoke("py:invoke", {
@@ -40,4 +39,5 @@ contextBridge.exposeInMainWorld("api", {
          ...payload,
       });
    },
+   getUuid: () => ipcRenderer.invoke("get-student-uuid"),
 });

@@ -3,8 +3,8 @@ import "@/styles/global.css";
 import App from "@/app/index.vue";
 import { router } from "@/lib/router";
 import SocketPlugin, { getSocket } from "@/plugins/socket";
-import { getUserId } from "./lib/user-id";
 import { useStore } from "./app/composables/use-store";
+import { getUuid } from "./lib/uuid";
 
 const app = createApp(App);
 
@@ -22,8 +22,8 @@ app.mount("#app").$nextTick(() => {
 // listen for monitoring data from Python client
 const socket = getSocket();
 const store = useStore();
-window.api.on("py:monitoring_data", (data) => {
-   let userId = getUserId();
+window.api.on("py:monitoring_data", async (data) => {
+   let userId = await getUuid();
    let roomCode = store.roomCode.value;
    if (!roomCode) {
       console.warn("No room found; cannot send monitoring data");

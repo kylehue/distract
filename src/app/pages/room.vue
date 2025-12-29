@@ -38,7 +38,6 @@ import { ref } from "vue";
 import { useRouter } from "vue-router";
 import { useSocket } from "@/app/composables/use-socket";
 import { useStore } from "@/app/composables/use-store";
-import { getUserId } from "@/lib/user-id";
 
 const router = useRouter();
 const socket = useSocket();

@@ -95,7 +95,7 @@ socket.on("connect", () => {
    joinRoom();
 });
 
-socket.on("student:room_update", (data) => {
+socket.on("student:update_room", (data) => {
    roomInfo.value = data.room as RoomInfo;
 });
 

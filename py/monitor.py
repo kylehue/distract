@@ -5,7 +5,7 @@ import json
 from detectors.main import extract_features_from_image, prepare_features_for_model
 
 # configuration
-interval_millis = 5000
+interval_millis = 1000
 number_of_samples = 10
 
 # internal state

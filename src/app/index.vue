@@ -42,7 +42,7 @@ async function monitorDataHandler(data: any) {
    console.log("Received monitoring data:", samples);
    socket.emit("student:monitoring_data", {
       roomCode: roomCode,
-      monitoringData: samples,
+      samples: samples,
    });
 }
 

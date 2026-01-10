@@ -25,10 +25,10 @@ import {
 import { darkThemeOverrides, lightThemeOverrides } from "@/lib/theme-overrides";
 import { onUnmounted, ref } from "vue";
 import { RouterView, useRoute, useRouter } from "vue-router";
-import { useSocket } from "./composables/use-socket";
+import { useFetch } from "./composables/use-fetch";
 const theme = ref<"light" | "dark">("dark");
-const socket = useSocket();
 const route = useRoute();
+const fetch = useFetch("/api/monitor_logs", "POST");
 
 // listen for monitoring data from Python client
 async function monitorDataHandler(data: any) {
@@ -38,12 +38,19 @@ async function monitorDataHandler(data: any) {
       return;
    }
 
-   let samples = data.data as number[][];
-   console.log("Received monitoring data:", samples);
-   socket.emit("student:monitoring_data", {
-      roomCode: roomCode,
-      samples: samples,
-   });
+   try {
+      let samples = data.data as number[][];
+      let body = new FormData();
+      body.append("roomCode", roomCode as string);
+      body.append("samples", JSON.stringify(samples));
+      // TODO: add video
+      await fetch.execute({
+         body: body,
+      });
+      console.log("Sent monitoring data to server");
+   } catch (e) {
+      console.error("Failed to send monitoring data:", e);
+   }
 }
 
 window.api.on("py:monitoring_data", monitorDataHandler);

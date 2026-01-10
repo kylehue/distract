@@ -9,7 +9,7 @@
             <NInput
                placeholder="Enter your name"
                v-model:value="studentName"
-               :disabled="isJoinRoomLoading"
+               :disabled="fetch.isLoading"
             >
                <template #prefix>
                   <PhUser />
@@ -24,7 +24,7 @@
             <NInput
                placeholder="Enter the room code"
                v-model:value="roomCode"
-               :disabled="isJoinRoomLoading"
+               :disabled="fetch.isLoading"
             >
                <template #prefix>
                   <PhHouseSimple />
@@ -33,7 +33,7 @@
          </NFormItem>
          <NButton
             @click="joinRoom()"
-            :loading="isJoinRoomLoading"
+            :loading="fetch.isLoading"
             class="mt-2! w-full!"
          >
             Join room
@@ -44,10 +44,11 @@
 
 <script setup lang="ts">
 import { ref } from "vue";
-import { NButton, NInput, NForm, NFormItem } from "naive-ui";
+import { NButton, NInput, NForm, NFormItem, useMessage } from "naive-ui";
 import { PhHouseSimple, PhUser } from "@phosphor-icons/vue";
 import { useRouter } from "vue-router";
-import { useSocketEvent } from "../composables/use-socket-event";
+import { useFetch } from "../composables/use-fetch";
+import { RoomInfo, RoomStudentInfo } from "@/lib/typings";
 
 const router = useRouter();
 const studentName = ref("");
@@ -56,32 +57,44 @@ const studentNameFeedback = ref("");
 const roomCode = ref("");
 const roomCodeStatus = ref<"error" | "success">("success");
 const roomCodeFeedback = ref("");
+const message = useMessage();
 
-const { execute: joinRoom, isLoading: isJoinRoomLoading } = useSocketEvent({
-   executeEvent: "student:join_room",
-   successEvent: "student:join_room_success",
-   errorEvent: "student:join_room_error",
-   executePayload: () => ({
-      studentName: studentName.value,
-      roomCode: roomCode.value,
-   }),
-   onBeforeExecute() {
-      studentNameStatus.value = "success";
-      studentNameFeedback.value = "";
-      roomCodeStatus.value = "success";
-      roomCodeFeedback.value = "";
-      return true;
-   },
-   onSuccess(data) {
-      router.push({
-         path: "/room/" + data.room.code,
-         query: {
-            studentName: data.student.studentName,
+const fetch = useFetch<{
+   room: RoomInfo;
+   student: RoomStudentInfo;
+   teacher: any;
+}>("/api/join_room", "POST");
+async function joinRoom() {
+   studentNameStatus.value = "success";
+   studentNameFeedback.value = "";
+   roomCodeStatus.value = "success";
+   roomCodeFeedback.value = "";
+
+   try {
+      const { data } = await fetch.execute({
+         body: {
+            studentName: studentName.value,
+            roomCode: roomCode.value,
          },
       });
-   },
-   onError(errorData) {
-      const fieldErrors = errorData.fieldErrors;
+
+      router.push({
+         path: "/room/" + data!.room.code,
+         query: {
+            studentName: data!.student.studentName,
+         },
+      });
+   } catch {
+      if (!fetch.error) {
+         return;
+      }
+
+      if (!fetch.error.fieldErrors) {
+         message.error(fetch.error.message);
+         return;
+      }
+
+      const fieldErrors = fetch.error.fieldErrors;
       if (fieldErrors.studentName) {
          studentNameStatus.value = "error";
          studentNameFeedback.value = fieldErrors.studentName;
@@ -91,6 +104,6 @@ const { execute: joinRoom, isLoading: isJoinRoomLoading } = useSocketEvent({
          roomCodeStatus.value = "error";
          roomCodeFeedback.value = fieldErrors.roomCode;
       }
-   },
-});
+   }
+}
 </script>

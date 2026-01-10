@@ -1,15 +1,13 @@
 import { io, Socket } from "socket.io-client";
 import type { App } from "vue";
 
-let socket: Socket;
+let socket: Socket = io("http://localhost:5000", {
+   autoConnect: true,
+   transports: ["websocket"],
+});
 
 export default {
    install(app: App) {
-      socket = io("http://localhost:5000", {
-         autoConnect: true,
-         transports: ["websocket"],
-      });
-
       socket.on("connect", () => {
          console.log("Socket connected:", socket.id);
       });

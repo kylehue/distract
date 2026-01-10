@@ -1,6 +1,6 @@
 <template>
    <div
-      v-if="isJoinRoomLoading"
+      v-if="fetchJoinRoom.isLoading"
       class="flex items-center justify-center w-full h-full"
    >
       <div class="flex items-center gap-2">
@@ -28,16 +28,13 @@
             }}
          </NText>
       </div>
-      <div class="flex flex-wrap">
-         <NText>{{ monitorData }}</NText>
-      </div>
       <div class="flex justify-end">
          <NButton
             @click="leaveRoom()"
             type="error"
             secondary
             :disabled="roomInfo.status === 'monitoring'"
-            :loading="isLeaveRoomLoading"
+            :loading="fetchLeaveRoom.isLoading"
          >
             Leave room
          </NButton>
@@ -47,47 +44,60 @@
 
 <script setup lang="ts">
 import { NButton, NSpin, NText, useMessage } from "naive-ui";
-import { onUnmounted, ref, watch } from "vue";
+import { onMounted, onUnmounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useSocket } from "@/app/composables/use-socket";
-import { useSocketEvent } from "../composables/use-socket-event";
-import { RoomInfo } from "@/lib/typings";
+import { RoomInfo, RoomStudentInfo } from "@/lib/typings";
+import { useFetch } from "../composables/use-fetch";
 
 const router = useRouter();
 const route = useRoute();
 const socket = useSocket();
 const message = useMessage();
-const monitorData = ref("");
 const roomInfo = ref<RoomInfo>();
 
-const { execute: joinRoom, isLoading: isJoinRoomLoading } = useSocketEvent({
-   executeEvent: "student:join_room",
-   successEvent: "student:join_room_success",
-   errorEvent: "student:join_room_error",
-   executeImmediately: true,
-   executePayload: () => ({
-      roomCode: route.params.roomCode,
-      studentName: route.query.studentName,
-   }),
-   onSuccess(data) {
-      roomInfo.value = data.room;
-   },
-   onError(errorData) {
+const fetchJoinRoom = useFetch<{
+   room: RoomInfo;
+   student: RoomStudentInfo;
+   teacher: any;
+}>("/api/join_room", "POST");
+
+const fetchLeaveRoom = useFetch("/api/leave_room", "PATCH");
+
+async function joinRoom() {
+   try {
+      const { data } = await fetchJoinRoom.execute({
+         body: {
+            roomCode: route.params.roomCode,
+            studentName: route.query.studentName,
+         },
+      });
+
+      roomInfo.value = data!.room;
+   } catch {
       router.push("/");
       message.error(
-         errorData.message || "Failed to join the room. Please try again."
+         fetchJoinRoom.error?.message ||
+            "Failed to join the room. Please try again."
       );
-   },
-});
+   }
+}
 
-const { execute: leaveRoom, isLoading: isLeaveRoomLoading } = useSocketEvent({
-   successEvent: "student:leave_room_success",
-   executeEvent: "student:leave_room",
-   onSuccess() {
+async function leaveRoom() {
+   try {
+      await fetchLeaveRoom.execute();
+
+      // socket.emit("student:leave_room", {});
+
       window.api.invoke("stop_monitoring", {});
       router.push("/");
-   },
-});
+   } catch {
+      message.error(
+         fetchLeaveRoom.error?.message ||
+            "Failed to leave the room. Please try again."
+      );
+   }
+}
 
 // on reconnect
 socket.on("connect", () => {
@@ -110,4 +120,8 @@ watch(
    },
    { immediate: true }
 );
+
+onMounted(() => {
+   joinRoom();
+});
 </script>

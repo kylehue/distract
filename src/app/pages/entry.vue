@@ -9,7 +9,7 @@
             <NInput
                placeholder="Enter your name"
                v-model:value="studentName"
-               :disabled="fetch.isLoading"
+               :disabled="postJoinRoom.isLoading"
             >
                <template #prefix>
                   <PhUser />
@@ -24,7 +24,7 @@
             <NInput
                placeholder="Enter the room code"
                v-model:value="roomCode"
-               :disabled="fetch.isLoading"
+               :disabled="postJoinRoom.isLoading"
             >
                <template #prefix>
                   <PhHouseSimple />
@@ -33,7 +33,7 @@
          </NFormItem>
          <NButton
             @click="joinRoom()"
-            :loading="fetch.isLoading"
+            :loading="postJoinRoom.isLoading"
             class="mt-2! w-full!"
          >
             Join room
@@ -48,7 +48,7 @@ import { NButton, NInput, NForm, NFormItem, useMessage } from "naive-ui";
 import { PhHouseSimple, PhUser } from "@phosphor-icons/vue";
 import { useRouter } from "vue-router";
 import { useFetch } from "../composables/use-fetch";
-import { RoomInfo, RoomStudentInfo } from "@/lib/typings";
+import { RoomInfo, StudentInfo } from "@/lib/typings";
 
 const router = useRouter();
 const studentName = ref("");
@@ -59,9 +59,9 @@ const roomCodeStatus = ref<"error" | "success">("success");
 const roomCodeFeedback = ref("");
 const message = useMessage();
 
-const fetch = useFetch<{
+const postJoinRoom = useFetch<{
    room: RoomInfo;
-   student: RoomStudentInfo;
+   student: StudentInfo;
    teacher: any;
 }>("/api/join_room", "POST");
 async function joinRoom() {
@@ -71,7 +71,7 @@ async function joinRoom() {
    roomCodeFeedback.value = "";
 
    try {
-      const { data } = await fetch.execute({
+      const { data } = await postJoinRoom.execute({
          body: {
             studentName: studentName.value,
             roomCode: roomCode.value,
@@ -81,20 +81,20 @@ async function joinRoom() {
       router.push({
          path: "/room/" + data!.room.code,
          query: {
-            studentName: data!.student.studentName,
+            studentName: data!.student.name,
          },
       });
    } catch {
-      if (!fetch.error) {
+      if (!postJoinRoom.error) {
          return;
       }
 
-      if (!fetch.error.fieldErrors) {
-         message.error(fetch.error.message);
+      if (!postJoinRoom.error.fieldErrors) {
+         message.error(postJoinRoom.error.message);
          return;
       }
 
-      const fieldErrors = fetch.error.fieldErrors;
+      const fieldErrors = postJoinRoom.error.fieldErrors;
       if (fieldErrors.studentName) {
          studentNameStatus.value = "error";
          studentNameFeedback.value = fieldErrors.studentName;

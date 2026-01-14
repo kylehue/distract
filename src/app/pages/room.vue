@@ -1,6 +1,6 @@
 <template>
    <div
-      v-if="fetchJoinRoom.isLoading"
+      v-if="postJoinRoom.isLoading"
       class="flex items-center justify-center w-full h-full"
    >
       <div class="flex items-center gap-2">
@@ -34,7 +34,7 @@
             type="error"
             secondary
             :disabled="roomInfo.status === 'monitoring'"
-            :loading="fetchLeaveRoom.isLoading"
+            :loading="patchLeaveRoom.isLoading"
          >
             Leave room
          </NButton>
@@ -44,10 +44,10 @@
 
 <script setup lang="ts">
 import { NButton, NSpin, NText, useMessage } from "naive-ui";
-import { onMounted, ref } from "vue";
+import { onMounted, onUnmounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useSocket } from "@/app/composables/use-socket";
-import { RoomInfo, RoomStudentInfo } from "@/lib/typings";
+import { RoomInfo, StudentInfo } from "@/lib/typings";
 import { useFetch } from "../composables/use-fetch";
 import { useVideoRecorder } from "../composables/use-video-recorder";
 import {
@@ -64,19 +64,19 @@ const roomInfo = ref<RoomInfo>();
 const videoRecorder = useVideoRecorder({
    chunkMillis: MONITOR_LOG_INTERVAL_MILLIS,
 });
-const fetchMonitorLogs = useFetch("/api/monitor_logs", "POST");
+const postMonitorLogs = useFetch("/api/monitor_logs", "POST");
 
-const fetchJoinRoom = useFetch<{
+const postJoinRoom = useFetch<{
    room: RoomInfo;
-   student: RoomStudentInfo;
+   student: StudentInfo;
    teacher: any;
 }>("/api/join_room", "POST");
 
-const fetchLeaveRoom = useFetch("/api/leave_room", "PATCH");
+const patchLeaveRoom = useFetch("/api/leave_room", "PATCH");
 
 async function joinRoom() {
    try {
-      const { data } = await fetchJoinRoom.execute({
+      const { data } = await postJoinRoom.execute({
          body: {
             roomCode: route.params.roomCode,
             studentName: route.query.studentName,
@@ -87,7 +87,7 @@ async function joinRoom() {
    } catch {
       router.push("/");
       message.error(
-         fetchJoinRoom.error?.message ||
+         postJoinRoom.error?.message ||
             "Failed to join the room. Please try again."
       );
    }
@@ -95,11 +95,11 @@ async function joinRoom() {
 
 async function leaveRoom() {
    try {
-      await fetchLeaveRoom.execute();
+      await patchLeaveRoom.execute();
       router.push("/");
    } catch {
       message.error(
-         fetchLeaveRoom.error?.message ||
+         patchLeaveRoom.error?.message ||
             "Failed to leave the room. Please try again."
       );
    }
@@ -122,7 +122,8 @@ videoRecorder.onChunk(async (chunk) => {
    body.append("samples", JSON.stringify(samples));
    body.append("video", chunk);
 
-   await fetchMonitorLogs.execute({
+   // TODO: MUST BE REAL-TIME
+   await postMonitorLogs.execute({
       body: body,
    });
 });
@@ -147,5 +148,10 @@ socket.on("student:stop_monitoring", async (data) => {
 
 onMounted(() => {
    joinRoom();
+});
+
+onUnmounted(() => {
+   videoRecorder.stop();
+   leaveRoom();
 });
 </script>

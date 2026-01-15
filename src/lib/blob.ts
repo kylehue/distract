@@ -100,3 +100,100 @@ export async function videoBlobToBase64Frames(
    URL.revokeObjectURL(videoEl.src);
    return frames;
 }
+
+export async function compressVideoBlob(
+   inputBlob: Blob,
+   options?: {
+      maxWidth?: number; // default 640
+      fps?: number; // default 20
+      videoQuality?: number; // 0-1, default 0.6
+   }
+): Promise<Blob> {
+   const maxWidth = options?.maxWidth || 640;
+   const fps = options?.fps || 20;
+   const videoQuality = options?.videoQuality ?? 0.6;
+
+   // Create video element
+   const video = document.createElement("video");
+   video.src = URL.createObjectURL(inputBlob);
+   video.muted = true;
+   video.playsInline = true;
+
+   // Wait for metadata
+   await new Promise<void>((resolve, reject) => {
+      video.onloadedmetadata = () => resolve();
+      video.onerror = reject;
+   });
+
+   const scale = Math.min(maxWidth / video.videoWidth, 1);
+   const canvas = document.createElement("canvas");
+   canvas.width = video.videoWidth * scale;
+   canvas.height = video.videoHeight * scale;
+   const ctx = canvas.getContext("2d")!;
+
+   // Capture canvas as video stream
+   const canvasStream = (canvas as any).captureStream(fps);
+
+   // Capture original audio
+   const audioCtx = new AudioContext();
+   const audioSource = audioCtx.createMediaElementSource(video);
+   const dest = audioCtx.createMediaStreamDestination();
+   audioSource.connect(dest);
+   audioSource.connect(audioCtx.destination); // optional for playback
+
+   // Combine video + audio
+   const combinedStream = new MediaStream([
+      ...canvasStream.getVideoTracks(),
+      ...dest.stream.getAudioTracks(),
+   ]);
+
+   // Determine bitrate
+   const minBitrate = 100_000; // 100 kbps
+   const maxBitrate = 800_000; // 800 kbps
+   const videoBits = Math.floor(
+      minBitrate + (maxBitrate - minBitrate) * videoQuality
+   );
+
+   // Setup MediaRecorder
+   const chunks: Blob[] = [];
+   const recorder = new MediaRecorder(combinedStream, {
+      mimeType: "video/webm; codecs=vp8,opus",
+      videoBitsPerSecond: videoBits,
+      audioBitsPerSecond: 64_000,
+   });
+
+   recorder.ondataavailable = (e) => {
+      if (e.data.size > 0) chunks.push(e.data);
+   };
+
+   recorder.start();
+
+   // Draw frames in sync with video
+   video.play();
+   const duration = video.duration;
+   const interval = 1000 / fps;
+
+   await new Promise<void>((resolve) => {
+      const drawFrame = () => {
+         if (video.paused || video.ended) {
+            resolve();
+            return;
+         }
+         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+         setTimeout(drawFrame, interval);
+      };
+      drawFrame();
+   });
+
+   // Stop recorder after video ends
+   recorder.stop();
+
+   await new Promise<void>((resolve) => {
+      recorder.onstop = () => resolve();
+   });
+
+   URL.revokeObjectURL(video.src);
+   audioCtx.close();
+
+   return new Blob(chunks, { type: "video/webm" });
+}

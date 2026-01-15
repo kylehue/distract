@@ -12,6 +12,8 @@
       "clean": "rimraf dist dist-electron dist-py release"
    },
    "dependencies": {
+      "@ffmpeg/ffmpeg": "^0.12.15",
+      "@ffmpeg/util": "^0.12.2",
       "@phosphor-icons/vue": "^2.2.1",
       "@tailwindcss/vite": "^4.1.13",
       "socket.io-client": "^4.8.1",

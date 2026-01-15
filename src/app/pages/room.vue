@@ -54,7 +54,7 @@ import {
    MONITOR_LOG_INTERVAL_MILLIS,
    MONITOR_LOG_NUMBER_OF_SAMPLES,
 } from "@/lib/constants";
-import { videoBlobToBase64Frames } from "@/lib/blob";
+import { compressVideoBlob, videoBlobToBase64Frames } from "@/lib/blob";
 
 const router = useRouter();
 const route = useRoute();
@@ -64,7 +64,10 @@ const roomInfo = ref<RoomInfo>();
 const videoRecorder = useVideoRecorder({
    chunkMillis: MONITOR_LOG_INTERVAL_MILLIS,
 });
-const postMonitorLogs = useFetch("/api/monitor_logs", "POST");
+const postMonitorLogRecording = useFetch(
+   "/api/monitor_logs/upload_recording",
+   "POST"
+);
 
 const postJoinRoom = useFetch<{
    room: RoomInfo;
@@ -105,25 +108,51 @@ async function leaveRoom() {
    }
 }
 
-videoRecorder.onChunk(async (chunk) => {
+const recordingMap = new Map<string, Promise<Blob>>();
+videoRecorder.onChunk(async (recording) => {
    let roomCode = route.params.roomCode;
    if (!roomCode) {
       console.warn("No room found; cannot send monitoring data");
       return;
    }
 
-   const frames = await videoBlobToBase64Frames(
-      chunk,
+   let transactionId = crypto.randomUUID();
+
+   // send as promise because we don't know when the recording follow-up will be requested
+   // we don't want to await here because that will degrade real-time performance
+   recordingMap.set(transactionId, compressVideoBlob(recording));
+
+   let frames = await videoBlobToBase64Frames(
+      recording, // use uncompressed
       MONITOR_LOG_NUMBER_OF_SAMPLES
    );
-   const samples = await window.api.invoke("extract_features", { frames });
-   let body = new FormData();
-   body.append("roomCode", roomCode as string);
-   body.append("samples", JSON.stringify(samples));
-   body.append("video", chunk);
 
-   // TODO: MUST BE REAL-TIME
-   await postMonitorLogs.execute({
+   let samples = await window.api.invoke("extract_features", { frames });
+
+   socket.emit("student:post_monitor_logs", {
+      transactionId: transactionId,
+      roomCode: roomCode,
+      samples: JSON.stringify(samples),
+   });
+});
+
+// video follow-up
+socket.on("student:post_monitor_logs_success", async (data) => {
+   let monitorLogId = data.monitorLogId;
+   let transactionId = data.transactionId;
+
+   let recordingPromise = recordingMap.get(transactionId);
+   if (!recordingPromise) {
+      console.warn("No video found for transaction ID:", transactionId);
+      return;
+   }
+
+   let recording = await recordingPromise;
+
+   let body = new FormData();
+   body.append("recording", recording);
+   body.append("monitorLogId", monitorLogId);
+   await postMonitorLogRecording.execute({
       body: body,
    });
 });

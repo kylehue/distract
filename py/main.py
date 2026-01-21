@@ -1,6 +1,5 @@
 import sys, json
-from utils.image import base64_to_cv2
-from detectors.main import extract_features_from_image, prepare_features_for_model
+from utils.model import extract_scores_from_base64_frames
 import logging
 
 
@@ -9,14 +8,12 @@ logger = logging.getLogger(__name__)
 
 
 def handle_message(msg):
-    if msg["type"] == "extract_features":
+    if msg["type"] == "extract_scores_from_base64_frames":
         frames = msg["frames"]
-        all_features = []
-        for frame in frames:
-            features = extract_features_from_image(base64_to_cv2(frame))
-            model_input = prepare_features_for_model(features)
-            all_features.append(model_input)
-        return {"correlationId": msg["correlationId"], "value": all_features}
+        return {
+            "correlationId": msg["correlationId"],
+            "value": extract_scores_from_base64_frames(frames),
+        }
     else:
         return {"type": "error", "data": "unknown type"}
 

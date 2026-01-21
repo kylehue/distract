@@ -6,7 +6,7 @@ from detectors.derived.eye_gaze import detect_eye_gaze
 
 
 # (COPY PASTED FROM GOOGLE COLAB)
-def extract_features_from_image(img):
+def extract_features_from_image(img) -> dict:
     features = {}
 
     # FACE BOUNDS
@@ -79,28 +79,3 @@ def extract_features_from_image(img):
         features["gaze_direction"] = "center"
 
     return features
-
-
-def prepare_features_for_model(features):
-    desired = [
-        "face_x",
-        "face_y",
-        "face_w",
-        "face_h",
-        "face_conf",
-        "eye_gaze_x",
-        "eye_gaze_y",
-        "head_yaw",
-        "head_pitch",
-        "head_roll",
-        "wrist_left_x",
-        "wrist_left_y",
-        "wrist_right_x",
-        "wrist_right_y",
-        "face_count",
-        "hand_count",
-        "face_present",
-        # "label",
-    ]
-
-    return [features.get(key, 0) for key in desired]

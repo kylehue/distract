@@ -8,12 +8,12 @@
          <NText>Loading...</NText>
       </div>
    </div>
-   <template v-else-if="!roomInfo">Room not found</template>
+   <template v-else-if="!roomInfo || !teacherInfo">Missing data</template>
    <div v-else class="flex flex-col w-full h-full">
       <div class="flex">
          <div class="flex flex-col">
             <NText class="text-xs" depth="3">Host</NText>
-            <NText>{{ roomInfo.teacherId }}</NText>
+            <NText>{{ teacherInfo.displayName }}</NText>
          </div>
       </div>
       <div class="flex flex-1 items-center justify-center">
@@ -47,32 +47,34 @@ import { NButton, NSpin, NText, useMessage } from "naive-ui";
 import { onMounted, onUnmounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useSocket } from "@/app/composables/use-socket";
-import { RoomInfo, StudentInfo } from "@/lib/typings";
+import {
+   RoomInfo,
+   StudentInfo,
+   TeacherInfo,
+   WarningLevel,
+} from "@/lib/typings";
 import { useFetch } from "../composables/use-fetch";
-import { useVideoRecorder } from "../composables/use-video-recorder";
 import {
    MONITOR_LOG_INTERVAL_MILLIS,
    MONITOR_LOG_NUMBER_OF_SAMPLES,
 } from "@/lib/constants";
-import { compressVideoBlob, videoBlobToBase64Frames } from "@/lib/blob";
+import { videoBlobToBase64Frames } from "@/lib/blob";
+import { useWebcamRecorder } from "../composables/use-webcam-recorder";
 
 const router = useRouter();
 const route = useRoute();
 const socket = useSocket();
 const message = useMessage();
 const roomInfo = ref<RoomInfo>();
-const videoRecorder = useVideoRecorder({
-   chunkMillis: MONITOR_LOG_INTERVAL_MILLIS,
+const teacherInfo = ref<TeacherInfo>();
+const webcamRecorder = useWebcamRecorder({
+   chunkIntervalMillis: MONITOR_LOG_INTERVAL_MILLIS,
 });
-const postMonitorLogRecording = useFetch(
-   "/api/monitor_logs/upload_recording",
-   "POST"
-);
 
 const postJoinRoom = useFetch<{
    room: RoomInfo;
    student: StudentInfo;
-   teacher: any;
+   teacher: TeacherInfo;
 }>("/api/join_room", "POST");
 
 const patchLeaveRoom = useFetch("/api/leave_room", "PATCH");
@@ -87,11 +89,12 @@ async function joinRoom() {
       });
 
       roomInfo.value = data!.room;
+      teacherInfo.value = data!.teacher;
    } catch {
       router.push("/");
       message.error(
          postJoinRoom.error?.message ||
-            "Failed to join the room. Please try again."
+            "Failed to join the room. Please try again.",
       );
    }
 }
@@ -103,58 +106,72 @@ async function leaveRoom() {
    } catch {
       message.error(
          patchLeaveRoom.error?.message ||
-            "Failed to leave the room. Please try again."
+            "Failed to leave the room. Please try again.",
       );
    }
 }
 
-const recordingMap = new Map<string, Promise<Blob>>();
-videoRecorder.onChunk(async (recording) => {
-   let roomCode = route.params.roomCode;
-   if (!roomCode) {
+const recordingMap = new Map<string, Blob>();
+webcamRecorder.onClipReady(async (clip) => {
+   if (!roomInfo.value) {
       console.warn("No room found; cannot send monitoring data");
       return;
    }
+   let roomCode = roomInfo.value.code;
 
    let transactionId = crypto.randomUUID();
 
    // send as promise because we don't know when the recording follow-up will be requested
    // we don't want to await here because that will degrade real-time performance
-   recordingMap.set(transactionId, compressVideoBlob(recording));
+   recordingMap.set(transactionId, clip.blob);
 
    let frames = await videoBlobToBase64Frames(
-      recording, // use uncompressed
-      MONITOR_LOG_NUMBER_OF_SAMPLES
+      clip.blob, // use uncompressed
+      MONITOR_LOG_NUMBER_OF_SAMPLES,
    );
 
-   let samples = await window.api.invoke("extract_features", { frames });
+   let scores: {
+      warning_level: WarningLevel;
+   } = await window.api.invoke("extract_scores_from_base64_frames", {
+      frames,
+   });
+
+   // skip
+   if (scores.warning_level === "none") return;
 
    socket.emit("student:post_monitor_logs", {
       transactionId: transactionId,
       roomCode: roomCode,
-      samples: JSON.stringify(samples),
+      scores: scores,
+      mimetype: clip.blob.type.split(";")[0],
    });
 });
 
 // video follow-up
-socket.on("student:post_monitor_logs_success", async (data) => {
-   let monitorLogId = data.monitorLogId;
+socket.on("student:upload_recording_url", async (data) => {
    let transactionId = data.transactionId;
+   let uploadUrl = data.url;
 
-   let recordingPromise = recordingMap.get(transactionId);
-   if (!recordingPromise) {
+   let recording = recordingMap.get(transactionId);
+   if (!recording) {
       console.warn("No video found for transaction ID:", transactionId);
       return;
    }
 
-   let recording = await recordingPromise;
-
-   let body = new FormData();
-   body.append("recording", recording);
-   body.append("monitorLogId", monitorLogId);
-   await postMonitorLogRecording.execute({
-      body: body,
-   });
+   try {
+      const result = await fetch(uploadUrl, {
+         method: "PUT",
+         headers: {
+            "Content-Type": recording.type.split(";")[0],
+         },
+         body: recording,
+      });
+      if (!result.ok) {
+         throw new Error("Failed to upload recording");
+      }
+   } catch (error) {
+      console.error(error);
+   }
 });
 
 // on reconnect
@@ -166,19 +183,29 @@ socket.on("connect", () => {
 socket.on("student:start_monitoring", async (data) => {
    const room = data.room as RoomInfo;
    roomInfo.value = room;
-   videoRecorder.start();
+   webcamRecorder.startRecording();
 });
 
 socket.on("student:pause_monitoring", async (data) => {
    const room = data.room as RoomInfo;
    roomInfo.value = room;
-   videoRecorder.stop();
+   webcamRecorder.stopRecording();
 });
 
 socket.on("student:stop_monitoring", async (data) => {
    const room = data.room as RoomInfo;
    roomInfo.value = room;
-   videoRecorder.stop();
+   webcamRecorder.stopRecording();
+});
+
+socket.on("student:update_room", async (data) => {
+   const room = data.room as RoomInfo;
+   roomInfo.value = room;
+});
+
+socket.on("student:delete_room", async (data) => {
+   message.error("The room has been deleted by the teacher.");
+   router.push("/");
 });
 
 onMounted(() => {
@@ -186,7 +213,6 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
-   videoRecorder.stop();
    leaveRoom();
 });
 </script>

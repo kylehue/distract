@@ -68,7 +68,7 @@ async function ensureDuration(video: HTMLVideoElement): Promise<number> {
 
 export async function videoBlobToBase64Frames(
    video: Blob,
-   framesCount: number
+   framesCount: number,
 ): Promise<string[]> {
    if (framesCount <= 0) return [];
 
@@ -99,103 +99,4 @@ export async function videoBlobToBase64Frames(
 
    URL.revokeObjectURL(videoEl.src);
    return frames;
-}
-
-export async function compressVideoBlob(
-   inputBlob: Blob,
-   options?: {
-      maxWidth?: number; // default 640
-      fps?: number; // default 20
-      videoQuality?: number; // 0-1, default 0.6
-   }
-): Promise<Blob> {
-   const maxWidth = options?.maxWidth || 640;
-   const fps = options?.fps || 15;
-   const videoQuality = options?.videoQuality ?? 0.6;
-
-   // Load video
-   const video = document.createElement("video");
-   video.src = URL.createObjectURL(inputBlob);
-   video.muted = true;
-   video.playsInline = true;
-
-   await new Promise<void>((resolve, reject) => {
-      video.onloadedmetadata = () => resolve();
-      video.onerror = reject;
-   });
-
-   // Scale video
-   const scale = Math.min(maxWidth / video.videoWidth, 1);
-   const canvas = document.createElement("canvas");
-   canvas.width = video.videoWidth * scale;
-   canvas.height = video.videoHeight * scale;
-   const ctx = canvas.getContext("2d")!;
-
-   // Capture video + audio
-   const canvasStream = canvas.captureStream();
-   const audioCtx = new AudioContext();
-   const audioSource = audioCtx.createMediaElementSource(video);
-   const audioDest = audioCtx.createMediaStreamDestination();
-   audioSource.connect(audioDest);
-   audioSource.connect(audioCtx.destination); // optional for preview
-
-   const combinedStream = new MediaStream([
-      ...canvasStream.getVideoTracks(),
-      ...audioDest.stream.getAudioTracks(),
-   ]);
-
-   // Determine bitrate
-   const minBitrate = 100_000;
-   const maxBitrate = 800_000;
-   const videoBits = Math.floor(
-      minBitrate + (maxBitrate - minBitrate) * videoQuality
-   );
-
-   const chunks: Blob[] = [];
-   const recorder = new MediaRecorder(combinedStream, {
-      mimeType: "video/webm; codecs=vp8,opus",
-      videoBitsPerSecond: videoBits,
-      audioBitsPerSecond: 64_000,
-   });
-
-   recorder.ondataavailable = (e) => {
-      if (e.data.size > 0) chunks.push(e.data);
-   };
-
-   const waitRecorderStop = new Promise<void>((resolve) => {
-      recorder.onstop = () => resolve();
-   });
-
-   recorder.start();
-
-   // Draw frames at target FPS
-   video.play();
-   const frameInterval = 1000 / fps;
-   let lastFrameTime = performance.now();
-
-   await new Promise<void>((resolve) => {
-      const draw = () => {
-         const now = performance.now();
-         if (now - lastFrameTime >= frameInterval) {
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-            lastFrameTime = now;
-         }
-
-         if (!video.paused && !video.ended) {
-            requestAnimationFrame(draw);
-         } else {
-            resolve();
-         }
-      };
-      requestAnimationFrame(draw);
-   });
-
-   recorder.stop();
-   await waitRecorderStop;
-
-   video.pause();
-   URL.revokeObjectURL(video.src);
-   audioCtx.close();
-
-   return new Blob(chunks, { type: "video/webm" });
 }

@@ -169,6 +169,12 @@ socket.on("student:start_monitoring", async (data) => {
    videoRecorder.start();
 });
 
+socket.on("student:pause_monitoring", async (data) => {
+   const room = data.room as RoomInfo;
+   roomInfo.value = room;
+   videoRecorder.stop();
+});
+
 socket.on("student:stop_monitoring", async (data) => {
    const room = data.room as RoomInfo;
    roomInfo.value = room;

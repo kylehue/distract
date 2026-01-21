@@ -1,9 +1,11 @@
 import { io, Socket } from "socket.io-client";
 import type { App } from "vue";
 
-let socket: Socket = io("http://localhost:5000", {
+let socket: Socket = io(import.meta.env.VITE_API_URL, {
    autoConnect: true,
-   transports: ["websocket"],
+   extraHeaders: {
+      "ngrok-skip-browser-warning": "True",
+   },
 });
 
 export default {

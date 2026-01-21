@@ -3,6 +3,9 @@ import { getUuid } from "@/lib/uuid";
 import { getSocket } from "@/plugins/socket";
 import { proxyRefs, ref } from "vue";
 
+const API = import.meta.env.VITE_API_URL;
+if (!API) throw new Error("VITE_API_URL is not defined");
+
 export type ApiSuccess<T> = {
    message: string;
    data?: T;
@@ -15,7 +18,7 @@ export type ApiError = {
 
 function resolveUrl(
    template: string,
-   params?: Record<string, string | number>
+   params?: Record<string, string | number>,
 ) {
    if (!params) return template;
 
@@ -24,7 +27,7 @@ function resolveUrl(
    for (const [key, value] of Object.entries(params)) {
       url = url.replace(
          new RegExp(`:${key}\\b`, "g"),
-         encodeURIComponent(String(value))
+         encodeURIComponent(String(value)),
       );
    }
 
@@ -33,7 +36,7 @@ function resolveUrl(
       const unresolved = url.match(/:[a-zA-Z_]\w*/g);
       if (unresolved) {
          throw new Error(
-            `Unresolved URL params: ${unresolved.join(", ")} in ${template}`
+            `Unresolved URL params: ${unresolved.join(", ")} in ${template}`,
          );
       }
    }
@@ -60,7 +63,7 @@ export function useFetch<T = any>(url: string, method: string = "GET") {
    };
 
    const execute = async (
-      options: ExecuteOptions = {}
+      options: ExecuteOptions = {},
    ): Promise<ApiSuccess<T>> => {
       isLoading.value = true;
       data.value = null;
@@ -81,6 +84,7 @@ export function useFetch<T = any>(url: string, method: string = "GET") {
             // attach uuid and sid
             "X-UUID": uuid,
             "X-SID": sid ?? "",
+            "ngrok-skip-browser-warning": "True",
          };
 
          let body: BodyInit | undefined;
@@ -92,21 +96,24 @@ export function useFetch<T = any>(url: string, method: string = "GET") {
             body = JSON.stringify(options.body);
          }
 
-         const res = await fetch(resolveUrl(url, options.params), {
-            ...options,
-            headers,
-            body,
-            method,
-            credentials: "include",
-         });
+         const res = await fetch(
+            resolveUrl(new URL(url, API).toString(), options.params),
+            {
+               ...options,
+               headers,
+               body,
+               method,
+               credentials: "include",
+            },
+         );
 
          const json = keysToCamel(await res.json());
 
          if (!res.ok) {
             // server-controlled error shape
             const apiError: ApiError = {
-               message: json?.message ?? "Request failed",
-               fieldErrors: json?.fieldErrors,
+               message: json?.detail?.message ?? "Request failed",
+               fieldErrors: json?.detail?.fieldErrors,
             };
             throw apiError;
          }

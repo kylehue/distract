@@ -43,7 +43,7 @@ if (!gotTheLock) {
             preload: path.join(__dirname, "preload.mjs"),
             contextIsolation: true,
             nodeIntegration: false,
-            devTools: IS_DEV,
+            devTools: IS_DEV || true, // TODO: remove true
          },
          autoHideMenuBar: true,
          width: 600,

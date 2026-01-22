@@ -208,6 +208,12 @@ socket.on("student:delete_room", async (data) => {
    router.push("/");
 });
 
+socket.on("student:notification", async (data) => {
+   const title = data.title as string;
+   const message = data.message as string;
+   window.api.showNotification({ title, body: message });
+});
+
 onMounted(() => {
    joinRoom();
 });

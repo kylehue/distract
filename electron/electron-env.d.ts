@@ -29,5 +29,6 @@ interface Window {
       off: (channel: string, listener: (...args: any[]) => void) => void;
       invoke: (type: string, payload: any) => Promise<any>;
       getUuid: () => Promise<string>;
+      showNotification: (payload: { title: string; body: string }) => Promise<void>;
    };
 }

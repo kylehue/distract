@@ -1,9 +1,11 @@
 import { app, BrowserWindow } from "electron";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
-import { setupPythonBridge, stopPython } from "./python-bridge";
-import { setupUuid } from "./uuid";
+import { setupPythonBridge, stopPython } from "./modules/python-bridge";
+import { setupUuid } from "./modules/uuid";
+import { setupNotifications } from "./modules/notifications";
 
+const APP_NAME = "Distract (Student Client)";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const IS_DEV = process.env.NODE_ENV === "development";
 
@@ -18,6 +20,12 @@ process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL
    : RENDERER_DIST;
 
 let win: BrowserWindow | null;
+
+// set app name
+app.setName(APP_NAME);
+if (process.platform === "win32") {
+   app.setAppUserModelId("Distract.StudentClient");
+}
 
 // ---------------------------
 // Single instance lock
@@ -48,7 +56,7 @@ if (!gotTheLock) {
          autoHideMenuBar: true,
          width: 600,
          height: 400,
-         title: "Distract (Student Client)",
+         title: APP_NAME,
          darkTheme: true,
       });
 
@@ -62,7 +70,7 @@ if (!gotTheLock) {
       win.webContents.on("did-finish-load", () => {
          win?.webContents.send(
             "main-process-message",
-            new Date().toLocaleString()
+            new Date().toLocaleString(),
          );
       });
 
@@ -93,8 +101,11 @@ if (!gotTheLock) {
 
    app.whenReady().then(() => {
       win = createWindow();
+
+      // setup modules
       setupPythonBridge(win);
       setupUuid();
+      setupNotifications();
    });
 
    app.on("before-quit", () => {

@@ -1,9 +1,11 @@
 import { app, BrowserWindow } from "electron";
+import { autoUpdater } from "electron-updater";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { setupPythonBridge, stopPython } from "./modules/python-bridge";
 import { setupUuid } from "./modules/uuid";
 import { setupNotifications } from "./modules/notifications";
+import pkg from "../package.json" assert { type: "json" };
 
 const APP_NAME = "Distract (Student Client)";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -24,7 +26,7 @@ let win: BrowserWindow | null;
 // set app name
 app.setName(APP_NAME);
 if (process.platform === "win32") {
-   app.setAppUserModelId("Distract.StudentClient");
+   app.setAppUserModelId(pkg.build.appId);
 }
 
 // ---------------------------
@@ -101,7 +103,7 @@ if (!gotTheLock) {
 
    app.whenReady().then(() => {
       win = createWindow();
-
+      autoUpdater.checkForUpdatesAndNotify();
       // setup modules
       setupPythonBridge(win);
       setupUuid();

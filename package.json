@@ -9,11 +9,10 @@
       "py:dev": "(if not exist py\\venv (python -m venv py\\venv)) && py\\venv\\Scripts\\python -m pip install -r py/requirements.txt && py\\venv\\Scripts\\python py/main.py",
       "py:build": "py\\venv\\Scripts\\python -m PyInstaller --onefile py/main.py --distpath dist-py --name main",
       "preview": "vite preview",
-      "clean": "rimraf dist dist-electron dist-py release"
+      "clean": "rimraf dist dist-electron dist-py release",
+      "publish": "electron-builder --publish=always"
    },
    "dependencies": {
-      "@ffmpeg/ffmpeg": "^0.12.15",
-      "@ffmpeg/util": "^0.12.2",
       "@phosphor-icons/vue": "^2.2.1",
       "@tailwindcss/vite": "^4.1.13",
       "socket.io-client": "^4.8.1",
@@ -26,6 +25,7 @@
       "concurrently": "^9.2.1",
       "electron": "^30.0.1",
       "electron-builder": "^24.13.3",
+      "electron-updater": "^6.7.3",
       "naive-ui": "^2.42.0",
       "rimraf": "^5.0.10",
       "typescript": "^5.2.2",
@@ -53,6 +53,24 @@
       ],
       "directories": {
          "output": "release"
+      },
+      "appId": "Distract.StudentClient",
+      "productName": "Distract",
+      "publish": [
+         {
+            "provider": "github",
+            "owner": "kylehue",
+            "repo": "distract"
+         }
+      ],
+      "win": {
+         "target": "nsis"
+      },
+      "mac": {
+         "target": "dmg"
+      },
+      "linux": {
+         "target": "AppImage"
       }
    }
 }

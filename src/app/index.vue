@@ -10,7 +10,9 @@
          <RouterView></RouterView>
       </NMessageProvider>
       <NGlobalStyle></NGlobalStyle>
-      <NText class="absolute right-2 bottom-1 text-xs pointer-events-none select-none opacity-25 font-mono">
+      <NText
+         class="absolute right-2 bottom-1 text-xs pointer-events-none select-none opacity-25 font-mono"
+      >
          {{ __APP_VERSION__ }}
       </NText>
    </NConfigProvider>
@@ -29,7 +31,9 @@ import {
 import { darkThemeOverrides, lightThemeOverrides } from "@/lib/theme-overrides";
 import { onUnmounted, ref } from "vue";
 import { RouterView } from "vue-router";
+import { useSocket } from "./composables/use-socket";
 const theme = ref<"light" | "dark">("dark");
+const socket = useSocket();
 
 const __APP_VERSION__ = (window as any).__APP_VERSION__;
 
@@ -38,6 +42,12 @@ function pyErrorHandler(data: any) {
 }
 
 window.api.on("py:error", pyErrorHandler);
+
+socket.on("student:notification", async (data) => {
+   const title = data.title as string;
+   const message = data.message as string;
+   window.api.showNotification({ title, body: message });
+});
 
 onUnmounted(() => {
    window.api.off("py:error", pyErrorHandler);

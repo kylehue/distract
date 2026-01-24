@@ -8,7 +8,9 @@
          <NText>Loading...</NText>
       </div>
    </div>
-   <template v-else-if="!roomInfo || !teacherInfo">Missing data</template>
+   <template v-else-if="!roomInfo || !teacherInfo || !studentInfo">
+      Missing data
+   </template>
    <div v-else class="flex flex-col w-full h-full">
       <div class="flex">
          <div class="flex flex-col">
@@ -18,6 +20,7 @@
       </div>
       <div class="flex flex-1 items-center justify-center">
          <NText
+            v-if="studentInfo.permitted"
             class="text-lg"
             :type="roomInfo.status === 'monitoring' ? 'error' : 'default'"
          >
@@ -26,6 +29,9 @@
                   ? "You are currently being monitored."
                   : "The teacher hasn't started monitoring yet."
             }}
+         </NText>
+         <NText v-else class="text-lg text-warning">
+            Your join request is pending approval from the teacher.
          </NText>
       </div>
       <div class="flex justify-end">
@@ -44,7 +50,7 @@
 
 <script setup lang="ts">
 import { NButton, NSpin, NText, useMessage } from "naive-ui";
-import { onMounted, onUnmounted, ref } from "vue";
+import { onMounted, onUnmounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useSocket } from "@/app/composables/use-socket";
 import {
@@ -67,6 +73,7 @@ const socket = useSocket();
 const message = useMessage();
 const roomInfo = ref<RoomInfo>();
 const teacherInfo = ref<TeacherInfo>();
+const studentInfo = ref<StudentInfo>();
 const webcamRecorder = useWebcamRecorder({
    chunkIntervalMillis: MONITOR_LOG_INTERVAL_MILLIS,
 });
@@ -90,6 +97,7 @@ async function joinRoom() {
 
       roomInfo.value = data!.room;
       teacherInfo.value = data!.teacher;
+      studentInfo.value = data!.student;
    } catch {
       router.push("/");
       message.error(
@@ -113,6 +121,7 @@ async function leaveRoom() {
 
 const recordingMap = new Map<string, Blob>();
 webcamRecorder.onClipReady(async (clip) => {
+   if (!studentInfo.value?.permitted) return;
    if (!roomInfo.value) {
       console.warn("No room found; cannot send monitoring data");
       return;
@@ -149,6 +158,7 @@ webcamRecorder.onClipReady(async (clip) => {
 
 // video follow-up
 socket.on("student:upload_recording_url", async (data) => {
+   if (!studentInfo.value?.permitted) return;
    let transactionId = data.transactionId;
    let uploadUrl = data.url;
 
@@ -180,45 +190,48 @@ socket.on("connect", () => {
    joinRoom();
 });
 
-socket.on("student:start_monitoring", async (data) => {
-   const room = data.room as RoomInfo;
-   roomInfo.value = room;
-   webcamRecorder.startRecording();
-});
-
-socket.on("student:pause_monitoring", async (data) => {
-   const room = data.room as RoomInfo;
-   roomInfo.value = room;
-   webcamRecorder.stopRecording();
-});
-
-socket.on("student:stop_monitoring", async (data) => {
-   const room = data.room as RoomInfo;
-   roomInfo.value = room;
-   webcamRecorder.stopRecording();
-});
-
 socket.on("student:update_room", async (data) => {
    const room = data.room as RoomInfo;
    roomInfo.value = room;
 });
 
-socket.on("student:delete_room", async (data) => {
+socket.on("student:delete_room", async () => {
    message.error("The room has been deleted by the teacher.");
    router.push("/");
 });
 
-socket.on("student:notification", async (data) => {
-   const title = data.title as string;
-   const message = data.message as string;
-   window.api.showNotification({ title, body: message });
+socket.on("student:update_student", async (data) => {
+   const student = data.student as StudentInfo;
+   studentInfo.value = student;
+});
+
+socket.on("student:room_approve", async () => {
+   message.success("You have been approved to join the room.");
+});
+
+socket.on("student:room_reject", async () => {
+   message.error("You have been forbidden from joining the room.");
+   router.push("/");
 });
 
 onMounted(() => {
    joinRoom();
 });
 
-onUnmounted(() => {
-   leaveRoom();
-});
+watch(
+   () => [roomInfo.value?.status, studentInfo.value?.permitted],
+   () => {
+      if (
+         roomInfo.value?.status === "monitoring" &&
+         studentInfo.value?.permitted
+      ) {
+         webcamRecorder.startRecording();
+      } else {
+         webcamRecorder.stopRecording();
+      }
+   },
+   {
+      immediate: true,
+   },
+);
 </script>

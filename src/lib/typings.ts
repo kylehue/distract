@@ -39,6 +39,7 @@ export interface StudentInfo {
    timeJoined: number;
    timeLeft?: number;
    active: boolean;
+   permitted: boolean;
    createdAt: number;
 }
 

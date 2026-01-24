@@ -5,7 +5,7 @@ import path from "node:path";
 import { setupPythonBridge, stopPython } from "./modules/python-bridge";
 import { setupUuid } from "./modules/uuid";
 import { setupNotifications } from "./modules/notifications";
-import pkg from "../package.json" assert { type: "json" };
+import pkg from "../package.json" with { type: "json" };
 
 const APP_NAME = "Distract (Student Client)";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));

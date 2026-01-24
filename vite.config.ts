@@ -3,7 +3,7 @@ import path from "node:path";
 import electron from "vite-plugin-electron/simple";
 import vue from "@vitejs/plugin-vue";
 import tailwindcss from "@tailwindcss/vite";
-import pkg from "./package.json" assert { type: "json" };
+import pkg from "./package.json" with { type: "json" };
 
 export default ({ mode }: any) => {
    const env = loadEnv(mode, process.cwd(), "VITE_");

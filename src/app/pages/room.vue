@@ -190,7 +190,7 @@ socket.on("connect", () => {
    joinRoom();
 });
 
-socket.on("student:update_room", async (data) => {
+socket.on("student:upsert_room", async (data) => {
    const room = data.room as RoomInfo;
    roomInfo.value = room;
 });
@@ -200,7 +200,7 @@ socket.on("student:delete_room", async () => {
    router.push("/");
 });
 
-socket.on("student:update_student", async (data) => {
+socket.on("student:upsert_student", async (data) => {
    const student = data.student as StudentInfo;
    studentInfo.value = student;
 });

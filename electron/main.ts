@@ -6,6 +6,7 @@ import { setupPythonBridge, stopPython } from "./modules/python-bridge";
 import { setupUuid } from "./modules/uuid";
 import { setupNotifications } from "./modules/notifications";
 import pkg from "../package.json" with { type: "json" };
+import { setupWindowLock } from "./modules/window-lock";
 
 const APP_NAME = "Distract (Student Client)";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -108,6 +109,7 @@ if (!gotTheLock) {
       setupPythonBridge(win);
       setupUuid();
       setupNotifications();
+      setupWindowLock(win);
    });
 
    app.on("before-quit", () => {

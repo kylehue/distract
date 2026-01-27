@@ -42,4 +42,6 @@ contextBridge.exposeInMainWorld("api", {
    getUuid: () => ipcRenderer.invoke("get-student-uuid"),
    showNotification: (payload: { title: string; body: string }) =>
       ipcRenderer.invoke("show-notification", payload),
+   lockWindow: () => ipcRenderer.invoke("lock-window"),
+   unlockWindow: () => ipcRenderer.invoke("unlock-window"),
 });

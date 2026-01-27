@@ -30,5 +30,7 @@ interface Window {
       invoke: (type: string, payload: any) => Promise<any>;
       getUuid: () => Promise<string>;
       showNotification: (payload: { title: string; body: string }) => Promise<void>;
+      lockWindow: () => Promise<void>;
+      unlockWindow: () => Promise<void>;
    };
 }

@@ -8,30 +8,31 @@
          <NText>Loading...</NText>
       </div>
    </div>
-   <template v-else-if="!roomInfo || !teacherInfo || !studentInfo">
-      Missing data
-   </template>
+   <template v-else-if="!room || !teacher || !student"> Missing data </template>
    <div v-else class="flex flex-col w-full h-full">
       <div class="flex">
          <div class="flex flex-col">
             <NText class="text-xs" depth="3">Host</NText>
-            <NText>{{ teacherInfo.displayName }}</NText>
+            <NText>{{ teacher.displayName }}</NText>
          </div>
       </div>
       <div class="flex flex-1 items-center justify-center">
+         <NText v-if="student.lockMonitorLogId" class="text-lg" type="error">
+            Your system has been locked due to suspicious behavior.
+         </NText>
+         <NText v-else-if="!student.permitted" class="text-lg" type="warning">
+            Your join request is pending approval from the teacher.
+         </NText>
          <NText
-            v-if="studentInfo.permitted"
+            v-else
             class="text-lg"
-            :type="roomInfo.status === 'monitoring' ? 'error' : 'default'"
+            :type="room.status === 'monitoring' ? 'error' : 'default'"
          >
             {{
-               roomInfo.status === "monitoring"
+               room.status === "monitoring"
                   ? "You are currently being monitored."
                   : "The teacher hasn't started monitoring yet."
             }}
-         </NText>
-         <NText v-else class="text-lg text-warning">
-            Your join request is pending approval from the teacher.
          </NText>
       </div>
       <div class="flex justify-end">
@@ -39,7 +40,7 @@
             @click="leaveRoom()"
             type="error"
             secondary
-            :disabled="roomInfo.status === 'monitoring'"
+            :disabled="room.status === 'monitoring'"
             :loading="patchLeaveRoom.isLoading"
          >
             Leave room
@@ -71,9 +72,9 @@ const router = useRouter();
 const route = useRoute();
 const socket = useSocket();
 const message = useMessage();
-const roomInfo = ref<RoomInfo>();
-const teacherInfo = ref<TeacherInfo>();
-const studentInfo = ref<StudentInfo>();
+const room = ref<RoomInfo>();
+const teacher = ref<TeacherInfo>();
+const student = ref<StudentInfo>();
 const webcamRecorder = useWebcamRecorder({
    chunkIntervalMillis: MONITOR_LOG_INTERVAL_MILLIS,
 });
@@ -95,9 +96,9 @@ async function joinRoom() {
          },
       });
 
-      roomInfo.value = data!.room;
-      teacherInfo.value = data!.teacher;
-      studentInfo.value = data!.student;
+      room.value = data!.room;
+      teacher.value = data!.teacher;
+      student.value = data!.student;
    } catch {
       router.push("/");
       message.error(
@@ -121,12 +122,12 @@ async function leaveRoom() {
 
 const recordingMap = new Map<string, Blob>();
 webcamRecorder.onClipReady(async (clip) => {
-   if (!studentInfo.value?.permitted) return;
-   if (!roomInfo.value) {
+   if (!student.value?.permitted) return;
+   if (!room.value) {
       console.warn("No room found; cannot send monitoring data");
       return;
    }
-   let roomCode = roomInfo.value.code;
+   let roomCode = room.value.code;
 
    let transactionId = crypto.randomUUID();
 
@@ -158,7 +159,7 @@ webcamRecorder.onClipReady(async (clip) => {
 
 // video follow-up
 socket.on("student:upload_recording_url", async (data) => {
-   if (!studentInfo.value?.permitted) return;
+   if (!student.value?.permitted) return;
    let transactionId = data.transactionId;
    let uploadUrl = data.url;
 
@@ -191,8 +192,14 @@ socket.on("connect", () => {
 });
 
 socket.on("student:upsert_room", async (data) => {
-   const room = data.room as RoomInfo;
-   roomInfo.value = room;
+   if (!room.value) {
+      room.value = data.room;
+   } else {
+      for (const key in data.room) {
+         // @ts-ignore
+         room.value[key] = data.room[key];
+      }
+   }
 });
 
 socket.on("student:delete_room", async () => {
@@ -201,8 +208,14 @@ socket.on("student:delete_room", async () => {
 });
 
 socket.on("student:upsert_student", async (data) => {
-   const student = data.student as StudentInfo;
-   studentInfo.value = student;
+   if (!student.value) {
+      student.value = data.student;
+   } else {
+      for (const key in data.student) {
+         // @ts-ignore
+         student.value[key] = data.student[key];
+      }
+   }
 });
 
 socket.on("student:room_approve", async () => {
@@ -219,12 +232,17 @@ onMounted(() => {
 });
 
 watch(
-   () => [roomInfo.value?.status, studentInfo.value?.permitted],
+   () => [room.value?.status, student.value?.permitted, student.value?.lockMonitorLogId],
    () => {
-      if (
-         roomInfo.value?.status === "monitoring" &&
-         studentInfo.value?.permitted
-      ) {
+      if (student.value?.lockMonitorLogId) {
+         window.api.lockWindow();
+         webcamRecorder.stopRecording();
+         return;
+      } else {
+         window.api.unlockWindow();
+      }
+
+      if (room.value?.status === "monitoring" && student.value?.permitted) {
          webcamRecorder.startRecording();
       } else {
          webcamRecorder.stopRecording();

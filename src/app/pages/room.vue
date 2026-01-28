@@ -67,6 +67,7 @@ import {
 } from "@/lib/constants";
 import { videoBlobToBase64Frames } from "@/lib/blob";
 import { useWebcamRecorder } from "../composables/use-webcam-recorder";
+import { useInterval } from "../composables/use-interval";
 
 const router = useRouter();
 const route = useRoute();
@@ -227,12 +228,22 @@ socket.on("student:room_reject", async () => {
    router.push("/");
 });
 
+useInterval(() => {
+   // tell the server we're still in the room so we can properly disconnect
+   // otherwise our uuid-sid mapping will expire
+   socket.emit("room_ping");
+}, 60000);
+
 onMounted(() => {
    joinRoom();
 });
 
 watch(
-   () => [room.value?.status, student.value?.permitted, student.value?.lockMonitorLogId],
+   () => [
+      room.value?.status,
+      student.value?.permitted,
+      student.value?.lockMonitorLogId,
+   ],
    () => {
       if (student.value?.lockMonitorLogId) {
          window.api.lockWindow();

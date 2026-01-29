@@ -4,6 +4,7 @@ setup(
     name="detectors",
     version="0.1.0",
     packages=find_packages(where="py"),
+    package_dir={"": "py"},
     install_requires=[
         "ultralytics>=8.0.0",
         "opencv-python>=4.11.0",

@@ -3,13 +3,7 @@ from setuptools import setup, find_packages
 setup(
     name="detectors",
     version="0.1.0",
-    packages=find_packages(
-        include=["*"],
-        exclude=[
-            "*_test",
-            "__pycache__",
-        ],
-    ),
+    packages=find_packages(where="py"),
     install_requires=[
         "ultralytics>=8.0.0",
         "opencv-python>=4.11.0",
@@ -19,5 +13,5 @@ setup(
     python_requires=">=3.8",
     author="kylehue",
     description="Collection of real-time detectors (phone, face, hands, etc.)",
-    url="https://github.com/kylehue/distract",
+    url="https://github.com/kylehue/distract/tree/main/py/detectors",
 )

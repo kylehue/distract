@@ -9,7 +9,6 @@ face_detection = mp_face_detection.FaceDetection(
 )
 
 
-# (COPY PASTED FROM GOOGLE COLAB)
 def detect_faces(frame):
     results = face_detection.process(frame)
 

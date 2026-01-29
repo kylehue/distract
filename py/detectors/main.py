@@ -5,7 +5,6 @@ from detectors.derived.head_pose import detect_head_pose
 from detectors.derived.eye_gaze import detect_eye_gaze
 
 
-# (COPY PASTED FROM GOOGLE COLAB)
 def extract_features_from_image(img) -> dict:
     features = {}
 

@@ -13,7 +13,6 @@ hands_detector = mp_hands.Hands(
 )
 
 
-# (COPY PASTED FROM GOOGLE COLAB)
 def detect_hands(frame):
     results = hands_detector.process(frame)
 

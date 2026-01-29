@@ -16,7 +16,6 @@ def _to_px(lm, w, h):
         return np.array([lm[0] * w, lm[1] * h], dtype=np.float64)
 
 
-# (COPY PASTED FROM GOOGLE COLAB)
 def _eye_gaze(landmarks, w, h, iris_idx, left_idx, right_idx, top_idx, bot_idx):
     """Return normalized gaze relative to eye bounding box (-1..1), safely."""
     try:

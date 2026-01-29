@@ -20,7 +20,6 @@ def _to_px(lm, w, h):
         return np.array([lm[0] * w, lm[1] * h], dtype=np.float64)
 
 
-# (COPY PASTED FROM GOOGLE COLAB)
 def head_pose_euler(landmarks, w, h):
     """Compute Euler angles (pitch, yaw, roll) from 2D landmarks via solvePnP."""
     nose = _to_px(landmarks[LANDMARKS["nose_tip"]], w, h)

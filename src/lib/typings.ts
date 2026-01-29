@@ -20,6 +20,7 @@ export interface RoomInfo {
    teacherAccountId: string;
    title: string;
    code: string;
+   studentCount: number;
    studentCapacity: number;
    status: "paused" | "monitoring" | "concluded";
    timeStarted?: number;

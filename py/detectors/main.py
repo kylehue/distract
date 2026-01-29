@@ -30,19 +30,19 @@ def extract_features_from_image(img) -> dict:
 
     # FACE MESH
     mesh = detect_face_mesh(img)
-    key = mesh["keypoints"]
+    # key = mesh["keypoints"]
 
-    def get_xy(point):
-        if point is None:
-            return (0.0, 0.0)
-        return (point[0], point[1])
+    # def get_xy(point):
+    #     if point is None:
+    #         return (0.0, 0.0)
+    #     return (point[0], point[1])
 
-    features["left_eye_x"], features["left_eye_y"] = get_xy(key["left_eye"])
-    features["right_eye_x"], features["right_eye_y"] = get_xy(key["right_eye"])
-    features["nose_tip_x"], features["nose_tip_y"] = get_xy(key["nose_tip"])
-    features["mouth_x"], features["mouth_y"] = get_xy(key["mouth"])
-    features["pupil_left_x"], features["pupil_left_y"] = get_xy(key["pupil_left"])
-    features["pupil_right_x"], features["pupil_right_y"] = get_xy(key["pupil_right"])
+    # features["left_eye_x"], features["left_eye_y"] = get_xy(key["left_eye"])
+    # features["right_eye_x"], features["right_eye_y"] = get_xy(key["right_eye"])
+    # features["nose_tip_x"], features["nose_tip_y"] = get_xy(key["nose_tip"])
+    # features["mouth_x"], features["mouth_y"] = get_xy(key["mouth"])
+    # features["pupil_left_x"], features["pupil_left_y"] = get_xy(key["pupil_left"])
+    # features["pupil_right_x"], features["pupil_right_y"] = get_xy(key["pupil_right"])
 
     # HANDS
     hands = detect_hands(img)
@@ -59,22 +59,22 @@ def extract_features_from_image(img) -> dict:
         features["head_yaw"] = hp["yaw"]
         features["head_pitch"] = hp["pitch"]
         features["head_roll"] = hp["roll"]
-        orientation = hp["orientation"]
+        # orientation = hp["orientation"]
     else:
         features["head_yaw"] = 0
         features["head_pitch"] = 0
         features["head_roll"] = 0
-        orientation = "forward"
+        # orientation = "forward"
 
-    features["head_pose"] = orientation
+    # features["head_pose"] = orientation
 
     # EYE GAZE
     if mesh["mesh_points"]:
         gaze = detect_eye_gaze(mesh["mesh_points"], img.shape)
         features["eye_gaze_x"], features["eye_gaze_y"] = gaze["gaze_point"]
-        features["gaze_direction"] = gaze["gaze_direction"]
+        # features["gaze_direction"] = gaze["gaze_direction"]
     else:
         features["eye_gaze_x"], features["eye_gaze_y"] = (0, 0)
-        features["gaze_direction"] = "center"
+        # features["gaze_direction"] = "center"
 
     return features

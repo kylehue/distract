@@ -84,7 +84,6 @@ export function useFetch<T = any>(url: string, method: string = "GET") {
             // attach uuid and sid
             "X-UUID": uuid,
             "X-SID": sid ?? "",
-            "ngrok-skip-browser-warning": "True",
          };
 
          let body: BodyInit | undefined;

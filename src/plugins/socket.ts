@@ -3,9 +3,6 @@ import type { App } from "vue";
 
 let socket: Socket = io(import.meta.env.VITE_API_URL, {
    autoConnect: true,
-   extraHeaders: {
-      "ngrok-skip-browser-warning": "True",
-   },
 });
 
 export default {

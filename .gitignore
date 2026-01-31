@@ -38,3 +38,6 @@ __pycache__/
 *.pyd
 
 .env*
+yolov8n.pt
+yolov8s.py
+yolov8m.pt

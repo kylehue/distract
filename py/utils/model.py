@@ -6,10 +6,19 @@ from utils.image import base64_to_cv2
 from utils.enum import WarningLevel
 import random
 from treeinterpreter import treeinterpreter as ti
+import os
+import sys
+
+
+def resource_path(relative_path: str) -> str:
+    if hasattr(sys, "_MEIPASS"):
+        return os.path.join(sys._MEIPASS, relative_path)
+    return os.path.abspath(relative_path)
+
 
 # Load models
-random_forest_model = joblib.load("py/models/random_forest_model.pkl")
-isolation_forest_model = joblib.load("py/models/isolation_forest_model.pkl")
+random_forest_model = joblib.load(resource_path("models/random_forest_model.pkl"))
+isolation_forest_model = joblib.load(resource_path("models/isolation_forest_model.pkl"))
 
 FEATURE_COLUMNS = [
     "face_x",

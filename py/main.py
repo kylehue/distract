@@ -14,6 +14,8 @@ def handle_message(msg):
             "correlationId": msg["correlationId"],
             "value": extract_scores_from_base64_frames(frames),
         }
+    elif msg["type"] == "ping":
+        return {"type": "pong"}
     else:
         return {"type": "error", "data": "unknown type"}
 
@@ -29,4 +31,5 @@ def main():
 
 
 if __name__ == "__main__":
+    print("Starting Python subprocess", flush=True)
     main()

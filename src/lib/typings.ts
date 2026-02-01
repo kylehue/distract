@@ -26,7 +26,7 @@ export interface RoomInfo {
    timeStarted?: number;
    timeEnded?: number;
    evidenceWarningLevel: WarningLevel;
-   severeWarningPunishment: boolean;
+   enablePunishments: boolean;
    allowLateStudents: boolean;
    joinConfirmation: boolean;
    createdAt: number;

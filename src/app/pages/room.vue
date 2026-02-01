@@ -44,7 +44,7 @@
             @click="leaveRoom()"
             type="error"
             secondary
-            :disabled="room.status === 'monitoring'"
+            :disabled="room.status === 'monitoring' || !!student?.lockMonitorLogId"
             :loading="patchLeaveRoom.isLoading"
          >
             Leave room

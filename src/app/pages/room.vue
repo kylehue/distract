@@ -10,10 +10,14 @@
    </div>
    <template v-else-if="!room || !teacher || !student"> Missing data </template>
    <div v-else class="flex flex-col w-full h-full">
-      <div class="flex">
+      <div class="flex justify-between items-center">
          <div class="flex flex-col">
             <NText class="text-xs" depth="3">Host</NText>
             <NText>{{ teacher.displayName }}</NText>
+         </div>
+         <div class="flex flex-col">
+            <NText class="text-xs" depth="3">Room</NText>
+            <NText>{{ room.title }}</NText>
          </div>
       </div>
       <div class="flex flex-1 items-center justify-center">
@@ -124,6 +128,7 @@ async function leaveRoom() {
 const recordingMap = new Map<string, Blob>();
 webcamRecorder.onClipReady(async (clip) => {
    if (!student.value?.permitted) return;
+   if (student.value?.lockMonitorLogId) return;
    if (!room.value) {
       console.warn("No room found; cannot send monitoring data");
       return;
@@ -137,23 +142,27 @@ webcamRecorder.onClipReady(async (clip) => {
    recordingMap.set(transactionId, clip.blob);
 
    let frames = await videoBlobToBase64Frames(
-      clip.blob, // use uncompressed
+      clip.blob,
       MONITOR_LOG_NUMBER_OF_SAMPLES,
    );
 
    let scores: {
       warning_level: WarningLevel;
-   } = await window.api.invoke("extract_scores_from_base64_frames", {
-      frames,
-   });
+   } = await window.api.invoke("extract_scores_from_base64_frames", { frames });
+
+   let isPhonePresent: boolean = await window.api.invoke(
+      "detect_phone_from_base64_frames",
+      { frames },
+   );
 
    // skip
-   if (scores.warning_level === "none") return;
+   if (scores.warning_level === "none" && !isPhonePresent) return;
 
    socket.emit("student:post_monitor_logs", {
       transactionId: transactionId,
       roomCode: roomCode,
       scores: scores,
+      isPhonePresent: isPhonePresent,
       mimetype: clip.blob.type.split(";")[0],
    });
 });

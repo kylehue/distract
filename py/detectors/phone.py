@@ -6,7 +6,7 @@ model = YOLO("yolov8n.pt")
 model.fuse()  # small speed & stability boost
 
 
-def detect_phone(frame, conf_thresh=0.15):
+def detect_phone(frame, conf_thresh=0.35):
     h, w = frame.shape[:2]
 
     # Run prediction

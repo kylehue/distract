@@ -2,6 +2,7 @@ from typing import List
 import joblib
 import pandas as pd
 from detectors.main import extract_features_from_image
+from detectors.phone import detect_phone
 from utils.image import base64_to_cv2
 from utils.enum import WarningLevel
 import random
@@ -18,7 +19,9 @@ def resource_path(relative_path: str) -> str:
 
 # Load models
 random_forest_model = joblib.load(resource_path("py/models/random_forest_model.pkl"))
-isolation_forest_model = joblib.load(resource_path("py/models/isolation_forest_model.pkl"))
+isolation_forest_model = joblib.load(
+    resource_path("py/models/isolation_forest_model.pkl")
+)
 
 FEATURE_COLUMNS = [
     "face_x",
@@ -100,6 +103,17 @@ def extract_scores_from_base64_frames(frames: List[str]):
         samples.append(model_input)
 
     return extract_scores(samples)
+
+
+def detect_phone_from_base64_frames(frames: List[str]):
+    is_phone_present = False
+    for frame in frames:
+        detections = detect_phone(base64_to_cv2(frame))
+        if detections:
+            is_phone_present = True
+            break
+
+    return is_phone_present
 
 
 # --- Example usage ---

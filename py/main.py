@@ -1,5 +1,5 @@
 import sys, json
-from utils.model import extract_scores_from_base64_frames
+from utils.model import detect_phone_from_base64_frames, extract_scores_from_base64_frames
 import logging
 
 
@@ -13,6 +13,12 @@ def handle_message(msg):
         return {
             "correlationId": msg["correlationId"],
             "value": extract_scores_from_base64_frames(frames),
+        }
+    elif msg["type"] == "detect_phone_from_base64_frames":
+        frames = msg["frames"]
+        return {
+            "correlationId": msg["correlationId"],
+            "value": detect_phone_from_base64_frames(frames),
         }
     elif msg["type"] == "ping":
         return {"type": "pong"}

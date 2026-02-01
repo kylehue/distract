@@ -3,14 +3,11 @@ import path from "node:path";
 import electron from "vite-plugin-electron/simple";
 import vue from "@vitejs/plugin-vue";
 import tailwindcss from "@tailwindcss/vite";
-import pkg from "./package.json" with { type: "json" };
 
 export default ({ mode }: any) => {
    const env = loadEnv(mode, process.cwd(), "VITE_");
-   const __APP_VERSION__ = pkg.version;
 
    return defineConfig({
-      define: { __APP_VERSION__ },
       plugins: [
          vue(),
          tailwindcss(),
@@ -18,15 +15,11 @@ export default ({ mode }: any) => {
             main: {
                // Shortcut of `build.lib.entry`.
                entry: "electron/main.ts",
-               vite: {
-                  define: { __APP_VERSION__ },
-               },
             },
             preload: {
                // Shortcut of `build.rollupOptions.input`.
                // Preload scripts may contain Web assets, so use the `build.rollupOptions.input` instead `build.lib.entry`.
                input: path.join(__dirname, "electron/preload.ts"),
-               vite: { define: { __APP_VERSION__ } },
             },
             // Ployfill the Electron and Node.js API for Renderer process.
             // If you want use Node.js in Renderer process, the `nodeIntegration` needs to be enabled in the Main process.

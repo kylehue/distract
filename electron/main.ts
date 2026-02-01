@@ -2,15 +2,27 @@ import { app, BrowserWindow } from "electron";
 import { autoUpdater } from "electron-updater";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
-import { setupPythonBridge, stopPython } from "./modules/python-bridge";
+import dotenv from "dotenv";
+import pkg from "../package.json" with { type: "json" };
+import { setupPythonBridge } from "./modules/python-bridge";
 import { setupUuid } from "./modules/uuid";
 import { setupNotifications } from "./modules/notifications";
-import pkg from "../package.json" with { type: "json" };
 import { setupWindowLock } from "./modules/window-lock";
+import { setupVersion } from "./modules/version";
+import { setupApiKey } from "./modules/api-key";
 
 const APP_NAME = "Distract (Student Client)";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const IS_DEV = process.env.NODE_ENV === "development";
+
+// setup env variables
+dotenv.config({
+   path: path.resolve(
+      __dirname,
+      "..",
+      IS_DEV ? ".env.development" : ".env.production",
+   ),
+});
 
 process.env.APP_ROOT = path.join(__dirname, "..");
 
@@ -21,8 +33,6 @@ export const RENDERER_DIST = path.join(process.env.APP_ROOT, "dist");
 process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL
    ? path.join(process.env.APP_ROOT, "public")
    : RENDERER_DIST;
-
-let win: BrowserWindow | null;
 
 // set app name
 app.setName(APP_NAME);
@@ -39,6 +49,7 @@ if (!gotTheLock) {
    // Another instance is already running -> exit this one
    app.quit();
 } else {
+   let win: BrowserWindow | null;
    // Handle second instance: focus the existing window
    app.on("second-instance", () => {
       if (win) {
@@ -63,7 +74,8 @@ if (!gotTheLock) {
          darkTheme: true,
       });
 
-      // win.removeMenu();
+      // TODO: uncomment
+      // if (!IS_DEV) win.removeMenu();
 
       if (IS_DEV) {
          win.webContents.openDevTools({ mode: "detach" });
@@ -110,9 +122,7 @@ if (!gotTheLock) {
       setupUuid();
       setupNotifications();
       setupWindowLock(win);
-   });
-
-   app.on("before-quit", () => {
-      stopPython();
+      setupApiKey();
+      setupVersion();
    });
 }

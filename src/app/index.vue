@@ -13,7 +13,7 @@
       <NText
          class="absolute right-2 bottom-1 text-xs pointer-events-none select-none opacity-25 font-mono"
       >
-         {{ __APP_VERSION__ }}
+         {{ appVersion }}
       </NText>
    </NConfigProvider>
 </template>
@@ -29,13 +29,13 @@ import {
    NText,
 } from "naive-ui";
 import { darkThemeOverrides, lightThemeOverrides } from "@/lib/theme-overrides";
-import { onUnmounted, ref } from "vue";
+import { onMounted, onUnmounted, ref } from "vue";
 import { RouterView } from "vue-router";
 import { useSocket } from "./composables/use-socket";
 const theme = ref<"light" | "dark">("dark");
 const socket = useSocket();
 
-const __APP_VERSION__ = (window as any).__APP_VERSION__;
+const appVersion = ref("");
 
 function pyErrorHandler(data: any) {
    console.log("Python error:", data?.data);
@@ -47,6 +47,10 @@ socket.on("student:notification", async (data) => {
    const title = data.title as string;
    const message = data.message as string;
    window.api.showNotification({ title, body: message });
+});
+
+onMounted(async () => {
+   appVersion.value = await window.api.getVersion();
 });
 
 onUnmounted(() => {

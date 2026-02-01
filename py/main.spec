@@ -8,7 +8,7 @@ mediapipe_datas = collect_data_files("mediapipe", include_py_files=True)
 datas = []
 datas += mediapipe_datas
 datas += [
-    ("models", "models"),
+    ("models", "py/models"),
 ]
 
 block_cipher = None

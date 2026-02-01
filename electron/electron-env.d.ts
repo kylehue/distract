@@ -32,5 +32,7 @@ interface Window {
       showNotification: (payload: { title: string; body: string }) => Promise<void>;
       lockWindow: () => Promise<void>;
       unlockWindow: () => Promise<void>;
+      getVersion: () => Promise<string>;
+      getApiKey: () => Promise<string>;
    };
 }

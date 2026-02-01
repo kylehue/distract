@@ -1,20 +1,20 @@
-import { BrowserWindow, ipcMain } from "electron";
+import { app, BrowserWindow, ipcMain } from "electron";
 import { spawn, ChildProcessWithoutNullStreams } from "node:child_process";
 import path from "node:path";
 
 const isDev = process.env.NODE_ENV === "development";
 
-// In dev → run Python script
+// In dev -> run Python script
 const PY_DEV_CMD = path.join(
    process.cwd(),
    "py",
    "venv",
    "Scripts",
-   "python.exe"
+   "python.exe",
 );
 const PY_DEV_SCRIPT = path.join(process.cwd(), "py", "main.py");
 
-// In prod → run frozen exe
+// In prod -> run frozen exe
 const PY_PROD_PATH = path.join(process.resourcesPath, "dist-py", "main.exe");
 
 let pyProc: ChildProcessWithoutNullStreams | null = null;
@@ -40,7 +40,7 @@ export function startPython() {
    return pyProc;
 }
 
-export function stopPython() {
+function stopPython() {
    if (pyProc) {
       pyProc.kill();
       pyProc = null;
@@ -63,7 +63,6 @@ export function setupPythonBridge(mainWindow: BrowserWindow) {
             const msg = JSON.parse(line);
 
             if (msg.type) {
-               // 🚀 generic forwarding:
                mainWindow.webContents.send(`py:${msg.type}`, msg);
             } else {
                console.log("[python stdout]", msg);
@@ -94,5 +93,9 @@ export function setupPythonBridge(mainWindow: BrowserWindow) {
          pyProc.stdout.on("data", listener);
          sendToPython(payload);
       });
+   });
+
+   app.on("before-quit", () => {
+      stopPython();
    });
 }

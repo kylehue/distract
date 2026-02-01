@@ -17,8 +17,8 @@ def resource_path(relative_path: str) -> str:
 
 
 # Load models
-random_forest_model = joblib.load(resource_path("models/random_forest_model.pkl"))
-isolation_forest_model = joblib.load(resource_path("models/isolation_forest_model.pkl"))
+random_forest_model = joblib.load(resource_path("py/models/random_forest_model.pkl"))
+isolation_forest_model = joblib.load(resource_path("py/models/isolation_forest_model.pkl"))
 
 FEATURE_COLUMNS = [
     "face_x",

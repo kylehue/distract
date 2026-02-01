@@ -44,4 +44,6 @@ contextBridge.exposeInMainWorld("api", {
       ipcRenderer.invoke("show-notification", payload),
    lockWindow: () => ipcRenderer.invoke("lock-window"),
    unlockWindow: () => ipcRenderer.invoke("unlock-window"),
+   getVersion: () => ipcRenderer.invoke("get-version"),
+   getApiKey: () => ipcRenderer.invoke("get-api-key"),
 });

@@ -1,6 +1,5 @@
 import { keysToCamel } from "@/lib/object";
-import { getUuid } from "@/lib/uuid";
-import { getSocket } from "@/plugins/socket";
+import { socket } from "@/lib/socket";
 import { proxyRefs, ref } from "vue";
 
 const API = import.meta.env.VITE_API_URL;
@@ -45,10 +44,10 @@ function resolveUrl(
 }
 
 async function waitForSocket() {
-   const socket = getSocket();
-   if (socket.connected) return socket;
-   return new Promise<typeof socket>((resolve) => {
-      socket.once("connect", () => resolve(socket));
+   const awaitedSocket = await socket;
+   if (awaitedSocket.connected) return awaitedSocket;
+   return new Promise<typeof awaitedSocket>(async (resolve) => {
+      awaitedSocket.once("connect", () => resolve(awaitedSocket));
    });
 }
 
@@ -77,13 +76,15 @@ export function useFetch<T = any>(url: string, method: string = "GET") {
          // wait for socket to be ready
          const socket = await waitForSocket();
          const sid = socket.id;
-         const uuid = await getUuid();
+         const uuid = await window.api.getUuid();
+         const apiKey = await window.api.getApiKey();
 
          const headers: HeadersInit = {
             ...options.headers,
             // attach uuid and sid
             "X-UUID": uuid,
             "X-SID": sid ?? "",
+            "X-API-KEY": apiKey,
          };
 
          let body: BodyInit | undefined;

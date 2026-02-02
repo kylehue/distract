@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 import cv2
 import joblib
 import pandas as pd
@@ -95,43 +95,57 @@ def extract_scores(samples: List[List[int]]) -> dict:
     }
 
 
-def read_image_from_path(frame_path: str):
-    img = cv2.imread(frame_path)
-    if img is None:
-        print(
-            {
-                "type": "error",
-                "data": f"Failed to read image from path: {frame_path}",
-            }
-        )
-    return img
+def extract_frames_from_video(video_path: str, sample_count: int) -> list:
+    cap = cv2.VideoCapture(video_path)
+    if not cap.isOpened():
+        raise RuntimeError(f"Failed to open video: {video_path}")
+
+    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    if total_frames == 0:
+        cap.release()
+        return []
+
+    actual_sample_count = min(sample_count, total_frames)
+    # Compute evenly spaced frame indices
+    indices = [
+        int(i * total_frames / actual_sample_count) for i in range(actual_sample_count)
+    ]
+
+    frames = []
+    for idx in indices:
+        cap.set(cv2.CAP_PROP_POS_FRAMES, idx)
+        ret, frame = cap.read()
+        if ret and frame is not None:
+            frames.append(frame)
+        else:
+            # If seeking fails, try reading the next frame
+            continue
+
+    cap.release()
+    return frames
 
 
-def extract_scores_from_frame_paths(frame_paths: List[str]):
+def use_model(video_path: str, sample_count: int):
     samples: List[List[int]] = []
-    for frame_path in frame_paths:
-        img = read_image_from_path(frame_path)
+
+    frames = extract_frames_from_video(video_path, sample_count)
+
+    for img in frames:
         if img is None:
             continue
+        img_for_phone_detection = img
         features = extract_features_from_image(img)
         model_input = [features.get(key, 0) for key in FEATURE_COLUMNS]
         samples.append(model_input)
 
-    return extract_scores(samples)
-
-
-def detect_phone_from_frame_paths(frame_paths: List[str]):
-    is_phone_present = False
-    for frame_path in frame_paths:
-        img = read_image_from_path(frame_path)
-        if img is None:
-            continue
-        detections = detect_phone(img)
-        if detections:
-            is_phone_present = True
-            break
-
-    return is_phone_present
+    return {
+        "scores": extract_scores(samples),
+        "isPhonePresent": (
+            bool(detect_phone(img_for_phone_detection))
+            if img_for_phone_detection is not None
+            else False
+        ),
+    }
 
 
 # --- Example usage ---

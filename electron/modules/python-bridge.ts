@@ -3,21 +3,7 @@ import { spawn, ChildProcessWithoutNullStreams } from "node:child_process";
 import path from "node:path";
 
 const IS_DEV = process.env.NODE_ENV === "development";
-const PY_PROD_PATH = path.join(
-   IS_DEV ? process.cwd() : process.resourcesPath,
-   "dist-py",
-   "main.exe",
-);
 
-const pending = new Map<
-   string,
-   {
-      resolve: (v: any) => void;
-      reject: (e: any) => void;
-   }
->();
-let pyProc: ChildProcessWithoutNullStreams | null = null;
-let bridgeInitialized = false;
 declare global {
    // eslint-disable-next-line no-var
    var __PY_PROC__: ChildProcessWithoutNullStreams | null;
@@ -29,7 +15,11 @@ export function startPython() {
       return global.__PY_PROC__;
    }
 
-   const proc = spawn(PY_PROD_PATH);
+   const proc = IS_DEV
+      ? spawn(path.join(process.cwd(), "py", "venv", "Scripts", "python.exe"), [
+           path.join(process.cwd(), "py", "main.py"),
+        ])
+      : spawn(path.join(process.resourcesPath, "dist-py", "main.exe"), []);
 
    proc.stderr.on("data", (data) => {
       console.error("[python stderr]", data.toString());
@@ -50,13 +40,41 @@ function stopPython() {
    }
 }
 
-function sendToPython(msg: any) {
-   if (!global.__PY_PROC__) throw new Error("Python not started");
-   global.__PY_PROC__.stdin.write(JSON.stringify(msg) + "\n");
+type PendingResolver = {
+   resolve: (v: any) => void;
+   reject: (e: any) => void;
+};
+
+type QueuedRequest = {
+   payload: any;
+   resolve: (v: any) => void;
+   reject: (e: any) => void;
+};
+
+const pending = new Map<string, PendingResolver>();
+const queue: QueuedRequest[] = [];
+let activeCorrelationId: string | null = null;
+
+function flushQueue() {
+   if (!global.__PY_PROC__) return;
+   if (activeCorrelationId) return; // Python busy
+   if (queue.length === 0) return;
+
+   const next = queue.shift()!;
+   const cid = next.payload.correlationId;
+
+   activeCorrelationId = cid;
+   pending.set(cid, {
+      resolve: next.resolve,
+      reject: next.reject,
+   });
+
+   // send payload to python
+   global.__PY_PROC__.stdin.write(JSON.stringify(next.payload) + "\n");
 }
+
 export function setupPythonBridge(mainWindow: BrowserWindow) {
-   if (bridgeInitialized) return;
-   bridgeInitialized = true;
+   if (global.__PY_PROC__) return;
 
    const pyProc = startPython();
 
@@ -64,12 +82,16 @@ export function setupPythonBridge(mainWindow: BrowserWindow) {
       const lines = data.toString().trim().split("\n");
 
       for (const line of lines) {
+         if (!line.trim()) continue;
          try {
             const msg = JSON.parse(line);
 
             if (msg.correlationId && pending.has(msg.correlationId)) {
                pending.get(msg.correlationId)!.resolve(msg.value);
                pending.delete(msg.correlationId);
+
+               activeCorrelationId = null;
+               flushQueue();
                continue;
             }
 
@@ -82,12 +104,12 @@ export function setupPythonBridge(mainWindow: BrowserWindow) {
       }
    });
 
-   ipcMain.handle("py:invoke", async (_evt, payload) => {
+   ipcMain.handle("py-invoke", async (_evt, payload) => {
       if (!global.__PY_PROC__) throw new Error("Python not running");
 
       return new Promise((resolve, reject) => {
-         pending.set(payload.correlationId, { resolve, reject });
-         sendToPython(payload);
+         queue.push({ payload, resolve, reject });
+         flushQueue();
       });
    });
 

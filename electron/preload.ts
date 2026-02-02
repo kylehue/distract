@@ -33,7 +33,7 @@ contextBridge.exposeInMainWorld("api", {
    },
    pyInvoke: (type: string, payload: any) => {
       const correlationId = Date.now() + Math.random().toString(16);
-      return ipcRenderer.invoke("py:invoke", {
+      return ipcRenderer.invoke("py-invoke", {
          type,
          correlationId,
          ...payload,
@@ -46,12 +46,11 @@ contextBridge.exposeInMainWorld("api", {
    unlockWindow: () => ipcRenderer.invoke("unlock-window"),
    getVersion: () => ipcRenderer.invoke("get-version"),
    getApiKey: () => ipcRenderer.invoke("get-api-key"),
-   writeTempFrames: (frames: Blob[]) => {
-      const buffers = frames.map((b) => b.arrayBuffer());
-      return Promise.all(buffers).then((bufs) => {
-         return ipcRenderer.invoke("write-temp-frames", bufs);
-      });
+   writeTempVideo: async (blob: Blob): Promise<string> => {
+      const buffer = Buffer.from(await blob.arrayBuffer());
+      return ipcRenderer.invoke("write-temp-video", buffer, blob.type);
    },
-   cleanupTempFrames: (framePaths: string[]) =>
-      ipcRenderer.invoke("cleanup-temp-frames", framePaths),
+   cleanupTempVideo: (videoPath: string) => {
+      ipcRenderer.invoke("cleanup-temp-video", videoPath);
+   },
 });

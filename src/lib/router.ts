@@ -6,6 +6,10 @@ const routes: RouteRecordRaw[] = [
    { path: "/", redirect: "/entry" },
    { path: "/entry", component: EntryPage },
    { path: "/room/:roomCode", component: RoomPage },
+   // {
+   //    path: "/_test-monitor",
+   //    component: () => import("@/app/pages/_test-monitor.vue"),
+   // },
 ];
 
 const router = createRouter({

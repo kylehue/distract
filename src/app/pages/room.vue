@@ -57,21 +57,15 @@
 
 <script setup lang="ts">
 import { NButton, NSpin, NText, useMessage } from "naive-ui";
-import { onMounted, onUnmounted, ref, watch } from "vue";
+import { onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useSocket } from "@/app/composables/use-socket";
-import {
-   RoomInfo,
-   StudentInfo,
-   TeacherInfo,
-   WarningLevel,
-} from "@/lib/typings";
+import { RoomInfo, StudentInfo, TeacherInfo } from "@/lib/typings";
 import { useFetch } from "../composables/use-fetch";
 import {
    MONITOR_LOG_INTERVAL_MILLIS,
    MONITOR_LOG_NUMBER_OF_SAMPLES,
 } from "@/lib/constants";
-import { videoBlobToBase64Frames, videoBlobToImageBlobs } from "@/lib/blob";
 import { useWebcamRecorder } from "../composables/use-webcam-recorder";
 import { useInterval } from "../composables/use-interval";
 
@@ -136,48 +130,33 @@ webcamRecorder.onClipReady(async (clip) => {
       return;
    }
    let roomCode = room.value.code;
-
    let transactionId = crypto.randomUUID();
 
    // send as promise because we don't know when the recording follow-up will be requested
    // we don't want to await here because that will degrade real-time performance
    recordingMap.set(transactionId, clip.blob);
-
-   console.log(123);
-
-   let frameBlobs = await videoBlobToImageBlobs(
-      clip.blob,
-      MONITOR_LOG_NUMBER_OF_SAMPLES,
-   );
-
-   console.log(frameBlobs);
-
-   let framePaths = await window.api.writeTempFrames(frameBlobs);
-
-   console.log(framePaths);
-
-   let scores: {
-      warning_level: WarningLevel;
-   } = await window.api.pyInvoke("extract_scores_from_frame_paths", {
-      framePaths,
+   let videoPath = await window.api.writeTempVideo(clip.blob);
+   let modelResults = await window.api.pyInvoke("use_model", {
+      videoPath,
+      sampleCount: MONITOR_LOG_NUMBER_OF_SAMPLES,
    });
 
-   let isPhonePresent: boolean = await window.api.pyInvoke(
-      "detect_phone_from_frame_paths",
-      { framePaths },
-   );
-
    // cleanup temp frames
-   window.api.cleanupTempFrames(framePaths);
+   window.api.cleanupTempVideo(videoPath);
 
    // skip
-   if (scores.warning_level === "none" && !isPhonePresent) return;
+   if (
+      modelResults.scores.warning_level === "none" &&
+      !modelResults.isPhonePresent
+   ) {
+      return;
+   }
 
    socket.emit("student:post_monitor_logs", {
       transactionId: transactionId,
       roomCode: roomCode,
-      scores: scores,
-      isPhonePresent: isPhonePresent,
+      scores: modelResults.scores,
+      isPhonePresent: modelResults.isPhonePresent,
       mimetype: clip.blob.type.split(";")[0],
    });
 });

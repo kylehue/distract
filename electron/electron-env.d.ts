@@ -34,7 +34,7 @@ interface Window {
       unlockWindow: () => Promise<void>;
       getVersion: () => Promise<string>;
       getApiKey: () => Promise<string>;
-      writeTempFrames: (frames: Blob[]) => Promise<string[]>;
-      cleanupTempFrames: (framePaths: string[]) => Promise<void>;
+      writeTempVideo: (video: Blob) => Promise<string>;
+      cleanupTempVideo: (videoPath: string) => Promise<void>;
    };
 }

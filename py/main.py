@@ -1,5 +1,5 @@
 import sys, json
-from utils.model import detect_phone_from_frame_paths, extract_scores_from_frame_paths
+from utils.model import use_model
 import logging
 
 
@@ -8,17 +8,12 @@ logger = logging.getLogger(__name__)
 
 
 def handle_message(msg):
-    if msg["type"] == "extract_scores_from_frame_paths":
-        frame_paths = msg["framePaths"]
+    if msg["type"] == "use_model":
+        video_path = msg["videoPath"]
+        sample_count = msg["sampleCount"]
         return {
             "correlationId": msg["correlationId"],
-            "value": extract_scores_from_frame_paths(frame_paths),
-        }
-    elif msg["type"] == "detect_phone_from_frame_paths":
-        frame_paths = msg["framePaths"]
-        return {
-            "correlationId": msg["correlationId"],
-            "value": detect_phone_from_frame_paths(frame_paths),
+            "value": use_model(video_path, sample_count),
         }
     elif msg["type"] == "ping":
         return {"type": "pong"}

@@ -1,3 +1,4 @@
+import { fixWebmDuration } from "@fix-webm-duration/fix";
 import { ref, onUnmounted, type Ref } from "vue";
 
 export interface RecordingOptions {
@@ -73,13 +74,13 @@ export function useWebcamRecorder(
    };
 
    // Create a video clip
-   const createVideoClip = (
+   const createVideoClip = async (
       blob: Blob,
       startTime: number,
       endTime: number,
-   ): VideoClip => {
+   ): Promise<VideoClip> => {
       return {
-         blob,
+         blob: await fixWebmDuration(blob, chunkIntervalMillis),
          startTime,
          endTime,
          duration: endTime - startTime,
@@ -157,14 +158,18 @@ export function useWebcamRecorder(
          };
 
          // Handle recording stop
-         mediaRecorder.onstop = () => {
+         mediaRecorder.onstop = async () => {
             const clipEndTime = Date.now();
 
             if (recordedChunks.length > 0) {
                const blob = new Blob(recordedChunks, {
                   type: selectedMimeType,
                });
-               const clip = createVideoClip(blob, clipStartTime, clipEndTime);
+               const clip = await createVideoClip(
+                  blob,
+                  clipStartTime,
+                  clipEndTime,
+               );
 
                sendClipToListeners(clip);
             }

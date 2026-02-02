@@ -10,6 +10,7 @@ import { setupNotifications } from "./modules/notifications";
 import { setupWindowLock } from "./modules/window-lock";
 import { setupVersion } from "./modules/version";
 import { setupApiKey } from "./modules/api-key";
+import { setupTempFrames } from "./modules/temp-frames";
 
 const APP_NAME = "Distract (Student Client)";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -124,5 +125,6 @@ if (!gotTheLock) {
       setupWindowLock(win);
       setupApiKey();
       setupVersion();
+      setupTempFrames();
    });
 }

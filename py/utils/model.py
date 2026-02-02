@@ -1,9 +1,9 @@
 from typing import List
+import cv2
 import joblib
 import pandas as pd
 from detectors.main import extract_features_from_image
 from detectors.phone import detect_phone
-from utils.image import base64_to_cv2
 from utils.enum import WarningLevel
 import random
 from treeinterpreter import treeinterpreter as ti
@@ -95,20 +95,38 @@ def extract_scores(samples: List[List[int]]) -> dict:
     }
 
 
-def extract_scores_from_base64_frames(frames: List[str]):
+def read_image_from_path(frame_path: str):
+    img = cv2.imread(frame_path)
+    if img is None:
+        print(
+            {
+                "type": "error",
+                "data": f"Failed to read image from path: {frame_path}",
+            }
+        )
+    return img
+
+
+def extract_scores_from_frame_paths(frame_paths: List[str]):
     samples: List[List[int]] = []
-    for frame in frames:
-        features = extract_features_from_image(base64_to_cv2(frame))
+    for frame_path in frame_paths:
+        img = read_image_from_path(frame_path)
+        if img is None:
+            continue
+        features = extract_features_from_image(img)
         model_input = [features.get(key, 0) for key in FEATURE_COLUMNS]
         samples.append(model_input)
 
     return extract_scores(samples)
 
 
-def detect_phone_from_base64_frames(frames: List[str]):
+def detect_phone_from_frame_paths(frame_paths: List[str]):
     is_phone_present = False
-    for frame in frames:
-        detections = detect_phone(base64_to_cv2(frame))
+    for frame_path in frame_paths:
+        img = read_image_from_path(frame_path)
+        if img is None:
+            continue
+        detections = detect_phone(img)
         if detections:
             is_phone_present = True
             break

@@ -1,5 +1,5 @@
 import sys, json
-from utils.model import detect_phone_from_base64_frames, extract_scores_from_base64_frames
+from utils.model import detect_phone_from_frame_paths, extract_scores_from_frame_paths
 import logging
 
 
@@ -8,17 +8,17 @@ logger = logging.getLogger(__name__)
 
 
 def handle_message(msg):
-    if msg["type"] == "extract_scores_from_base64_frames":
-        frames = msg["frames"]
+    if msg["type"] == "extract_scores_from_frame_paths":
+        frame_paths = msg["framePaths"]
         return {
             "correlationId": msg["correlationId"],
-            "value": extract_scores_from_base64_frames(frames),
+            "value": extract_scores_from_frame_paths(frame_paths),
         }
-    elif msg["type"] == "detect_phone_from_base64_frames":
-        frames = msg["frames"]
+    elif msg["type"] == "detect_phone_from_frame_paths":
+        frame_paths = msg["framePaths"]
         return {
             "correlationId": msg["correlationId"],
-            "value": detect_phone_from_base64_frames(frames),
+            "value": detect_phone_from_frame_paths(frame_paths),
         }
     elif msg["type"] == "ping":
         return {"type": "pong"}

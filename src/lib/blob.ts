@@ -100,3 +100,48 @@ export async function videoBlobToBase64Frames(
    URL.revokeObjectURL(videoEl.src);
    return frames;
 }
+
+export async function videoBlobToImageBlobs(
+   video: Blob,
+   framesCount: number,
+): Promise<Blob[]> {
+   if (framesCount <= 0) return [];
+
+   const videoEl = document.createElement("video");
+   videoEl.muted = true;
+   videoEl.playsInline = true;
+   videoEl.src = URL.createObjectURL(video);
+
+   await waitFor(videoEl, "loadedmetadata");
+
+   const duration = await ensureDuration(videoEl);
+
+   const canvas = document.createElement("canvas");
+   canvas.width = videoEl.videoWidth;
+   canvas.height = videoEl.videoHeight;
+
+   const ctx = canvas.getContext("2d");
+   if (!ctx) throw new Error("Failed to get canvas context");
+
+   const frames: Blob[] = [];
+
+   for (let i = 0; i < framesCount; i++) {
+      const time = (i + 0.5) * (duration / framesCount);
+      await seek(videoEl, Math.min(time, duration - 0.001));
+
+      ctx.drawImage(videoEl, 0, 0, canvas.width, canvas.height);
+
+      const blob = await new Promise<Blob>((resolve, reject) => {
+         canvas.toBlob(
+            (b) => (b ? resolve(b) : reject(new Error("toBlob failed"))),
+            "image/jpeg",
+            0.85,
+         );
+      });
+
+      frames.push(blob);
+   }
+
+   URL.revokeObjectURL(videoEl.src);
+   return frames;
+}

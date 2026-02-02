@@ -4,9 +4,8 @@
    "version": "0.0.3",
    "type": "module",
    "scripts": {
-      "dev": "concurrently \"vite\" \"npm:py:dev\"",
+      "dev": "vite",
       "build": "npm run clean && npm run py:build && vue-tsc && vite build && electron-builder",
-      "py:dev": "(if not exist py\\venv (python -m venv py\\venv)) && py\\venv\\Scripts\\python -m pip install -r py/requirements.txt && py\\venv\\Scripts\\python py/main.py",
       "py:build": "py\\venv\\Scripts\\python -m PyInstaller py\\main.spec --distpath dist-py",
       "preview": "vite preview",
       "clean": "rimraf dist dist-electron dist-py release",

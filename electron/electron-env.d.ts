@@ -27,12 +27,14 @@ interface Window {
    api: {
       on: (channel: string, cb: (data: any) => void) => void;
       off: (channel: string, listener: (...args: any[]) => void) => void;
-      invoke: (type: string, payload: any) => Promise<any>;
+      pyInvoke: (type: string, payload: any) => Promise<any>;
       getUuid: () => Promise<string>;
       showNotification: (payload: { title: string; body: string }) => Promise<void>;
       lockWindow: () => Promise<void>;
       unlockWindow: () => Promise<void>;
       getVersion: () => Promise<string>;
       getApiKey: () => Promise<string>;
+      writeTempFrames: (frames: Blob[]) => Promise<string[]>;
+      cleanupTempFrames: (framePaths: string[]) => Promise<void>;
    };
 }

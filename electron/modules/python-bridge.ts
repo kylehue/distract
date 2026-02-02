@@ -2,95 +2,91 @@ import { app, BrowserWindow, ipcMain } from "electron";
 import { spawn, ChildProcessWithoutNullStreams } from "node:child_process";
 import path from "node:path";
 
-const isDev = process.env.NODE_ENV === "development";
-
-// In dev -> run Python script
-const PY_DEV_CMD = path.join(
-   process.cwd(),
-   "py",
-   "venv",
-   "Scripts",
-   "python.exe",
+const IS_DEV = process.env.NODE_ENV === "development";
+const PY_PROD_PATH = path.join(
+   IS_DEV ? process.cwd() : process.resourcesPath,
+   "dist-py",
+   "main.exe",
 );
-const PY_DEV_SCRIPT = path.join(process.cwd(), "py", "main.py");
 
-// In prod -> run frozen exe
-const PY_PROD_PATH = path.join(process.resourcesPath, "dist-py", "main.exe");
-
+const pending = new Map<
+   string,
+   {
+      resolve: (v: any) => void;
+      reject: (e: any) => void;
+   }
+>();
 let pyProc: ChildProcessWithoutNullStreams | null = null;
+let bridgeInitialized = false;
+declare global {
+   // eslint-disable-next-line no-var
+   var __PY_PROC__: ChildProcessWithoutNullStreams | null;
+}
 
+global.__PY_PROC__ ??= null;
 export function startPython() {
-   if (pyProc) return pyProc; // already running
-
-   if (isDev) {
-      pyProc = spawn(PY_DEV_CMD, [PY_DEV_SCRIPT]);
-   } else {
-      pyProc = spawn(PY_PROD_PATH, []);
+   if (global.__PY_PROC__) {
+      return global.__PY_PROC__;
    }
 
-   pyProc.stderr.on("data", (data) => {
+   const proc = spawn(PY_PROD_PATH);
+
+   proc.stderr.on("data", (data) => {
       console.error("[python stderr]", data.toString());
    });
 
-   pyProc.on("exit", (code) => {
-      console.log(`Python exited with code ${code}`);
-      pyProc = null;
+   proc.on("exit", () => {
+      global.__PY_PROC__ = null;
    });
 
-   return pyProc;
+   global.__PY_PROC__ = proc;
+   return proc;
 }
 
 function stopPython() {
-   if (pyProc) {
-      pyProc.kill();
-      pyProc = null;
+   if (global.__PY_PROC__) {
+      global.__PY_PROC__.kill();
+      global.__PY_PROC__ = null;
    }
 }
 
-// Sends a JSON message to Python
 function sendToPython(msg: any) {
-   if (!pyProc) throw new Error("Python not started");
-   pyProc.stdin.write(JSON.stringify(msg) + "\n");
+   if (!global.__PY_PROC__) throw new Error("Python not started");
+   global.__PY_PROC__.stdin.write(JSON.stringify(msg) + "\n");
 }
-
 export function setupPythonBridge(mainWindow: BrowserWindow) {
-   let pyProc = startPython();
+   if (bridgeInitialized) return;
+   bridgeInitialized = true;
+
+   const pyProc = startPython();
 
    pyProc.stdout.on("data", (data) => {
       const lines = data.toString().trim().split("\n");
+
       for (const line of lines) {
          try {
             const msg = JSON.parse(line);
 
+            if (msg.correlationId && pending.has(msg.correlationId)) {
+               pending.get(msg.correlationId)!.resolve(msg.value);
+               pending.delete(msg.correlationId);
+               continue;
+            }
+
             if (msg.type) {
                mainWindow.webContents.send(`py:${msg.type}`, msg);
-            } else {
-               console.log("[python stdout]", msg);
             }
-         } catch (err) {
+         } catch {
             console.log("[python raw]", line);
          }
       }
    });
 
-   // Generic request/response
    ipcMain.handle("py:invoke", async (_evt, payload) => {
-      return new Promise<any>((resolve, reject) => {
-         if (!pyProc) return reject("Python not running");
+      if (!global.__PY_PROC__) throw new Error("Python not running");
 
-         const listener = (data: Buffer) => {
-            try {
-               const msg = JSON.parse(data.toString());
-               if (msg.correlationId === payload.correlationId) {
-                  resolve(msg.value);
-                  pyProc?.stdout.off("data", listener);
-               }
-            } catch (err) {
-               reject(err);
-            }
-         };
-
-         pyProc.stdout.on("data", listener);
+      return new Promise((resolve, reject) => {
+         pending.set(payload.correlationId, { resolve, reject });
          sendToPython(payload);
       });
    });

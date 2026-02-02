@@ -31,7 +31,7 @@ contextBridge.exposeInMainWorld("api", {
    off: (channel: string, listener: (...args: any[]) => void) => {
       ipcRenderer.removeListener(channel, listener);
    },
-   invoke: (type: string, payload: any) => {
+   pyInvoke: (type: string, payload: any) => {
       const correlationId = Date.now() + Math.random().toString(16);
       return ipcRenderer.invoke("py:invoke", {
          type,
@@ -46,4 +46,12 @@ contextBridge.exposeInMainWorld("api", {
    unlockWindow: () => ipcRenderer.invoke("unlock-window"),
    getVersion: () => ipcRenderer.invoke("get-version"),
    getApiKey: () => ipcRenderer.invoke("get-api-key"),
+   writeTempFrames: (frames: Blob[]) => {
+      const buffers = frames.map((b) => b.arrayBuffer());
+      return Promise.all(buffers).then((bufs) => {
+         return ipcRenderer.invoke("write-temp-frames", bufs);
+      });
+   },
+   cleanupTempFrames: (framePaths: string[]) =>
+      ipcRenderer.invoke("cleanup-temp-frames", framePaths),
 });

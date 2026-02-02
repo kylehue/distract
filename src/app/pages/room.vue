@@ -44,7 +44,9 @@
             @click="leaveRoom()"
             type="error"
             secondary
-            :disabled="room.status === 'monitoring' || !!student?.lockMonitorLogId"
+            :disabled="
+               room.status === 'monitoring' || !!student?.lockMonitorLogId
+            "
             :loading="patchLeaveRoom.isLoading"
          >
             Leave room
@@ -69,7 +71,7 @@ import {
    MONITOR_LOG_INTERVAL_MILLIS,
    MONITOR_LOG_NUMBER_OF_SAMPLES,
 } from "@/lib/constants";
-import { videoBlobToBase64Frames } from "@/lib/blob";
+import { videoBlobToBase64Frames, videoBlobToImageBlobs } from "@/lib/blob";
 import { useWebcamRecorder } from "../composables/use-webcam-recorder";
 import { useInterval } from "../composables/use-interval";
 
@@ -141,19 +143,32 @@ webcamRecorder.onClipReady(async (clip) => {
    // we don't want to await here because that will degrade real-time performance
    recordingMap.set(transactionId, clip.blob);
 
-   let frames = await videoBlobToBase64Frames(
+   console.log(123);
+
+   let frameBlobs = await videoBlobToImageBlobs(
       clip.blob,
       MONITOR_LOG_NUMBER_OF_SAMPLES,
    );
 
+   console.log(frameBlobs);
+
+   let framePaths = await window.api.writeTempFrames(frameBlobs);
+
+   console.log(framePaths);
+
    let scores: {
       warning_level: WarningLevel;
-   } = await window.api.invoke("extract_scores_from_base64_frames", { frames });
+   } = await window.api.pyInvoke("extract_scores_from_frame_paths", {
+      framePaths,
+   });
 
-   let isPhonePresent: boolean = await window.api.invoke(
-      "detect_phone_from_base64_frames",
-      { frames },
+   let isPhonePresent: boolean = await window.api.pyInvoke(
+      "detect_phone_from_frame_paths",
+      { framePaths },
    );
+
+   // cleanup temp frames
+   window.api.cleanupTempFrames(framePaths);
 
    // skip
    if (scores.warning_level === "none" && !isPhonePresent) return;

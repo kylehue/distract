@@ -158,6 +158,7 @@ webcamRecorder.onClipReady(async (clip) => {
       scores: modelResults.scores,
       isPhonePresent: modelResults.isPhonePresent,
       mimetype: clip.blob.type.split(";")[0],
+      startTime: new Date(clip.startTime).toISOString(),
    });
 });
 

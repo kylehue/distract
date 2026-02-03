@@ -1,6 +1,6 @@
 <template>
    <div class="flex items-center justify-center w-full h-full">
-      <NForm>
+      <NForm @keydown.enter="joinRoom()">
          <NFormItem
             label="Student Name"
             :validation-status="studentNameStatus"

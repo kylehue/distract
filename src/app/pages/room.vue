@@ -57,10 +57,10 @@
 
 <script setup lang="ts">
 import { NButton, NSpin, NText, useMessage } from "naive-ui";
-import { onMounted, ref, watch } from "vue";
+import { onMounted, onBeforeUnmount, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useSocket } from "@/app/composables/use-socket";
-import { RoomInfo, StudentInfo, TeacherInfo } from "@/lib/typings";
+import type { RoomInfo, StudentInfo, TeacherInfo } from "@/lib/typings";
 import { useFetch } from "../composables/use-fetch";
 import {
    MONITOR_LOG_INTERVAL_MILLIS,
@@ -68,14 +68,20 @@ import {
 } from "@/lib/constants";
 import { useWebcamRecorder } from "../composables/use-webcam-recorder";
 import { useInterval } from "../composables/use-interval";
+import {
+   OfflineMonitorQueue,
+   type OfflineMonitorLog,
+} from "@/lib/offline-monitor-queue";
 
 const router = useRouter();
 const route = useRoute();
 const socket = useSocket();
 const message = useMessage();
+
 const room = ref<RoomInfo>();
 const teacher = ref<TeacherInfo>();
 const student = ref<StudentInfo>();
+
 const webcamRecorder = useWebcamRecorder({
    chunkIntervalMillis: MONITOR_LOG_INTERVAL_MILLIS,
 });
@@ -87,6 +93,8 @@ const postJoinRoom = useFetch<{
 }>("/api/join_room", "POST");
 
 const patchLeaveRoom = useFetch("/api/leave_room", "PATCH");
+
+const offline = new OfflineMonitorQueue(socket);
 
 async function joinRoom() {
    try {
@@ -111,6 +119,8 @@ async function joinRoom() {
 
 async function leaveRoom() {
    try {
+      webcamRecorder.stopRecording();
+      offline.clearMemoryOnly();
       await patchLeaveRoom.execute();
       router.push("/");
    } catch {
@@ -121,77 +131,78 @@ async function leaveRoom() {
    }
 }
 
-const recordingMap = new Map<string, Blob>();
 webcamRecorder.onClipReady(async (clip) => {
    if (!student.value?.permitted) return;
    if (student.value?.lockMonitorLogId) return;
-   if (!room.value) {
-      console.warn("No room found; cannot send monitoring data");
-      return;
-   }
-   let roomCode = room.value.code;
-   let transactionId = crypto.randomUUID();
+   if (!room.value) return;
 
-   // send as promise because we don't know when the recording follow-up will be requested
-   // we don't want to await here because that will degrade real-time performance
-   recordingMap.set(transactionId, clip.blob);
-   let videoPath = await window.api.writeTempVideo(clip.blob);
-   let modelResults = await window.api.pyInvoke("use_model", {
+   const uuid = await window.api.getUuid();
+   const roomCode = room.value.code;
+   const transactionId = crypto.randomUUID();
+
+   // keep memory blob for fast upload
+   offline.rememberRecording(transactionId, clip.blob);
+
+   // always persist to disk for offline/restart-safe evidence upload
+   const videoPath = await window.api.writeTempVideo(clip.blob);
+   offline.rememberVideoPath(transactionId, videoPath);
+
+   const modelResults = await window.api.pyInvoke("use_model", {
       videoPath,
       sampleCount: MONITOR_LOG_NUMBER_OF_SAMPLES,
    });
 
-   // cleanup temp frames
-   window.api.cleanupTempVideo(videoPath);
-
-   socket.emit("student:post_monitor_logs", {
-      transactionId: transactionId,
-      roomCode: roomCode,
+   const payload: OfflineMonitorLog = {
+      uuid,
+      transactionId,
+      roomCode,
       scores: modelResults.scores,
       isPhonePresent: modelResults.isPhonePresent,
       mimetype: clip.blob.type.split(";")[0],
       startTime: new Date(clip.startTime).toISOString(),
-   });
+      videoPath,
+      createdAt: new Date().toISOString(),
+   };
+
+   await offline.sendOrQueueLog(payload);
 });
 
 // video follow-up
 socket.on("student:upload_recording_url", async (data) => {
    if (!student.value?.permitted) return;
-   let transactionId = data.transactionId;
-   let uploadUrl = data.url;
-
-   let recording = recordingMap.get(transactionId);
-   if (!recording) {
-      console.warn("No video found for transaction ID:", transactionId);
-      return;
-   }
-
-   try {
-      const result = await fetch(uploadUrl, {
-         method: "PUT",
-         headers: {
-            "Content-Type": recording.type.split(";")[0],
-         },
-         body: recording,
-      });
-      if (!result.ok) {
-         throw new Error("Failed to upload recording");
-      }
-   } catch (error) {
-      console.error(error);
-   }
+   await offline.handleUploadRecordingUrl({
+      transactionId: data.transactionId,
+      url: data.url,
+   });
 });
 
-// on reconnect
-socket.on("connect", () => {
+// connection lifecycle
+socket.on("connect", async () => {
    console.log("Rejoining room...");
-   joinRoom();
+   await joinRoom();
+   await offline.flushQueuedLogs();
 });
 
+useInterval(() => {
+   socket.emit("room_ping");
+}, 60000);
+
+onMounted(async () => {
+   await joinRoom();
+
+   // flush once on mount too (connect could have fired already)
+   await offline.hydrateFromDisk();
+   await offline.flushQueuedLogs();
+});
+
+onBeforeUnmount(() => {
+   webcamRecorder.stopRecording();
+});
+
+// real-time updates
 socket.on("student:upsert_room", async (data) => {
-   if (!room.value) {
-      room.value = data.room;
-   } else {
+   if (!room.value) room.value = data.room;
+   else {
       for (const key in data.room) {
          // @ts-ignore
          room.value[key] = data.room[key];
@@ -205,9 +216,8 @@ socket.on("student:delete_room", async () => {
 });
 
 socket.on("student:upsert_student", async (data) => {
-   if (!student.value) {
-      student.value = data.student;
-   } else {
+   if (!student.value) student.value = data.student;
+   else {
       for (const key in data.student) {
          // @ts-ignore
          student.value[key] = data.student[key];
@@ -224,16 +234,6 @@ socket.on("student:room_reject", async () => {
    router.push("/");
 });
 
-useInterval(() => {
-   // tell the server we're still in the room so we can properly disconnect
-   // otherwise our uuid-sid mapping will expire
-   socket.emit("room_ping");
-}, 60000);
-
-onMounted(() => {
-   joinRoom();
-});
-
 watch(
    () => [
       room.value?.status,
@@ -242,11 +242,8 @@ watch(
    ],
    () => {
       if (student.value?.lockMonitorLogId) {
-         window.api.lockWindow();
          webcamRecorder.stopRecording();
          return;
-      } else {
-         window.api.unlockWindow();
       }
 
       if (room.value?.status === "monitoring" && student.value?.permitted) {
@@ -255,8 +252,18 @@ watch(
          webcamRecorder.stopRecording();
       }
    },
-   {
-      immediate: true,
+   { immediate: true },
+);
+
+watch(
+   () => student.value?.lockMonitorLogId,
+   () => {
+      if (student.value?.lockMonitorLogId) {
+         window.api.lockWindow();
+      } else {
+         window.api.unlockWindow();
+      }
    },
+   { immediate: true },
 );
 </script>

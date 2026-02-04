@@ -1,8 +1,9 @@
-import { onUnmounted, ref, unref } from "vue";
+import { onUnmounted, computed, unref } from "vue";
 import { keysToCamel } from "@/lib/object";
-import { socket } from "@/lib/socket";
+import { isConnected as _isConnected, socket } from "@/lib/socket";
 
 export function useSocket() {
+   const isConnected = computed(() => _isConnected.value);
    async function on(
       event: string,
       handler: (data: Record<any, any>) => void,
@@ -38,5 +39,28 @@ export function useSocket() {
       }
    }
 
-   return { socket, on, emit };
+   async function emitWithAck<TRes = any>(
+      event: string,
+      data: Record<any, any> = {},
+      timeoutMs = 8000,
+   ): Promise<TRes> {
+      data["uuid"] = await window.api.getUuid();
+      const payload = unref(data);
+
+      if (process.env.NODE_ENV === "development") {
+         console.log(`CLIENT -> SERVER (ACK ${event}):\n`, payload);
+      }
+
+      const res = await (await socket)
+         .timeout(timeoutMs)
+         .emitWithAck(event, payload);
+
+      if (process.env.NODE_ENV === "development") {
+         console.log(`SERVER ACK -> CLIENT (${event}):\n`, res);
+      }
+
+      return keysToCamel(res) as TRes;
+   }
+
+   return { socket, isConnected, on, emit, emitWithAck };
 }

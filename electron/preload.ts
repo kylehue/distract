@@ -50,7 +50,16 @@ contextBridge.exposeInMainWorld("api", {
       const buffer = Buffer.from(await blob.arrayBuffer());
       return ipcRenderer.invoke("write-temp-video", buffer, blob.type);
    },
-   cleanupTempVideo: (videoPath: string) => {
-      ipcRenderer.invoke("cleanup-temp-video", videoPath);
-   },
+   readTempVideo: (videoPath: string) =>
+      ipcRenderer.invoke("read-temp-video", videoPath),
+   cleanupTempVideo: (videoPath: string) =>
+      ipcRenderer.invoke("cleanup-temp-video", videoPath),
+   writeTempMonitorLog: (data: Record<any, any>): Promise<string> =>
+      ipcRenderer.invoke("write-temp-monitor-log", data),
+   getTempMonitorLogs: (): Promise<{ filePath: string; data: any }[]> =>
+      ipcRenderer.invoke("get-temp-monitor-logs"),
+   deleteTempMonitorLog: (filePath: string) =>
+      ipcRenderer.invoke("delete-temp-monitor-log", filePath),
+   cleanupTempMonitorLogs: () =>
+      ipcRenderer.invoke("cleanup-temp-monitor-logs"),
 });

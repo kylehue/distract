@@ -144,14 +144,6 @@ webcamRecorder.onClipReady(async (clip) => {
    // cleanup temp frames
    window.api.cleanupTempVideo(videoPath);
 
-   // skip
-   if (
-      modelResults.scores.warning_level === "none" &&
-      !modelResults.isPhonePresent
-   ) {
-      return;
-   }
-
    socket.emit("student:post_monitor_logs", {
       transactionId: transactionId,
       roomCode: roomCode,

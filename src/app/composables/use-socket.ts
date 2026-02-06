@@ -30,7 +30,6 @@ export function useSocket() {
    }
 
    async function emit(event: string, data: Record<any, any> = {}) {
-      data["uuid"] = await window.api.getUuid(); // attach uuid
       (await socket).emit(event, unref(data));
 
       // dev logging
@@ -44,7 +43,6 @@ export function useSocket() {
       data: Record<any, any> = {},
       timeoutMs = 8000,
    ): Promise<TRes> {
-      data["uuid"] = await window.api.getUuid();
       const payload = unref(data);
 
       if (process.env.NODE_ENV === "development") {

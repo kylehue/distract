@@ -9,7 +9,7 @@
             <NInput
                placeholder="Enter your name"
                v-model:value="studentName"
-               :disabled="postJoinRoom.isLoading"
+               :disabled="isLoading"
             >
                <template #prefix>
                   <PhUser />
@@ -24,7 +24,7 @@
             <NInput
                placeholder="Enter the room code"
                v-model:value="roomCode"
-               :disabled="postJoinRoom.isLoading"
+               :disabled="isLoading"
             >
                <template #prefix>
                   <PhHouseSimple />
@@ -33,7 +33,7 @@
          </NFormItem>
          <NButton
             @click="joinRoom()"
-            :loading="postJoinRoom.isLoading"
+            :loading="isLoading"
             class="mt-2! w-full!"
          >
             Join room
@@ -47,8 +47,8 @@ import { ref } from "vue";
 import { NButton, NInput, NForm, NFormItem, useMessage } from "naive-ui";
 import { PhHouseSimple, PhUser } from "@phosphor-icons/vue";
 import { useRouter } from "vue-router";
-import { useFetch } from "../composables/use-fetch";
 import { RoomInfo, StudentInfo } from "@/lib/typings";
+import { useSocket } from "../composables/use-socket";
 
 const router = useRouter();
 const studentName = ref("");
@@ -58,25 +58,26 @@ const roomCode = ref("");
 const roomCodeStatus = ref<"error" | "success">("success");
 const roomCodeFeedback = ref("");
 const message = useMessage();
-
-const postJoinRoom = useFetch<{
-   room: RoomInfo;
-   student: StudentInfo;
-   teacher: any;
-}>("/api/join_room", "POST");
+const socket = useSocket();
+const isLoading = ref(false);
 async function joinRoom() {
    studentNameStatus.value = "success";
    studentNameFeedback.value = "";
    roomCodeStatus.value = "success";
    roomCodeFeedback.value = "";
+   isLoading.value = true;
 
    try {
-      const { data } = await postJoinRoom.execute({
-         body: {
-            studentName: studentName.value,
-            roomCode: roomCode.value,
-         },
-      });
+      const data = await socket.emitWithAck<{
+         room: RoomInfo;
+         student: StudentInfo;
+         fieldErrors?: Record<string, string>;
+      }>("student:join_room", {
+         studentName: studentName.value,
+         roomCode: roomCode.value,
+      }, 5000);
+
+      if (data.fieldErrors) throw { fieldErrors: data.fieldErrors };
 
       router.push({
          path: "/room/" + data!.room.code,
@@ -84,17 +85,14 @@ async function joinRoom() {
             studentName: data!.student.name,
          },
       });
-   } catch {
-      if (!postJoinRoom.error) {
+   } catch (error: any) {
+      if (!error?.fieldErrors) {
+         message.error("An unknown error occurred while joining the room.");
+         console.error("Unknown error in joinRoom:", error);
          return;
       }
 
-      if (!postJoinRoom.error.fieldErrors) {
-         message.error(postJoinRoom.error.message);
-         return;
-      }
-
-      const fieldErrors = postJoinRoom.error.fieldErrors;
+      const fieldErrors = error.fieldErrors;
       if (fieldErrors.studentName) {
          studentNameStatus.value = "error";
          studentNameFeedback.value = fieldErrors.studentName;
@@ -104,6 +102,8 @@ async function joinRoom() {
          roomCodeStatus.value = "error";
          roomCodeFeedback.value = fieldErrors.roomCode;
       }
+   } finally {
+      isLoading.value = false;
    }
 }
 </script>

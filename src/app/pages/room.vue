@@ -1,6 +1,6 @@
 <template>
    <div
-      v-if="postJoinRoom.isLoading"
+      v-if="isJoinRoomLoading"
       class="flex items-center justify-center w-full h-full"
    >
       <div class="flex items-center gap-2">
@@ -47,7 +47,7 @@
             :disabled="
                room.status === 'monitoring' || !!student?.lockMonitorLogId
             "
-            :loading="patchLeaveRoom.isLoading"
+            :loading="isLeaveRoomLoading"
          >
             Leave room
          </NButton>
@@ -81,53 +81,56 @@ const message = useMessage();
 const room = ref<RoomInfo>();
 const teacher = ref<TeacherInfo>();
 const student = ref<StudentInfo>();
+const isJoinRoomLoading = ref(false);
+const isLeaveRoomLoading = ref(false);
 
 const webcamRecorder = useWebcamRecorder({
    chunkIntervalMillis: MONITOR_LOG_INTERVAL_MILLIS,
 });
 
-const postJoinRoom = useFetch<{
-   room: RoomInfo;
-   student: StudentInfo;
-   teacher: TeacherInfo;
-}>("/api/join_room", "POST");
-
-const patchLeaveRoom = useFetch("/api/leave_room", "PATCH");
-
 const offline = new OfflineMonitorQueue(socket);
 
 async function joinRoom() {
+   isJoinRoomLoading.value = true;
    try {
-      const { data } = await postJoinRoom.execute({
-         body: {
+      const data = await socket.emitWithAck<{
+         room: RoomInfo;
+         student: StudentInfo;
+         teacher: TeacherInfo;
+         fieldErrors?: Record<string, string>;
+      }>(
+         "student:join_room",
+         {
             roomCode: route.params.roomCode,
             studentName: route.query.studentName,
          },
-      });
+         5000,
+      );
+
+      if (data.fieldErrors) throw "Invalid";
 
       room.value = data!.room;
       teacher.value = data!.teacher;
       student.value = data!.student;
    } catch {
       router.push("/");
-      message.error(
-         postJoinRoom.error?.message ||
-            "Failed to join the room. Please try again.",
-      );
+      message.error("Failed to join the room. Please try again.");
+   } finally {
+      isJoinRoomLoading.value = false;
    }
 }
 
 async function leaveRoom() {
+   isLeaveRoomLoading.value = true;
    try {
       webcamRecorder.stopRecording();
       offline.clearMemoryOnly();
-      await patchLeaveRoom.execute();
+      await socket.emitWithAck("student:leave_room", {}, 5000);
       router.push("/");
    } catch {
-      message.error(
-         patchLeaveRoom.error?.message ||
-            "Failed to leave the room. Please try again.",
-      );
+      message.error("Failed to leave the room. Please try again.");
+   } finally {
+      isLeaveRoomLoading.value = false;
    }
 }
 
@@ -184,7 +187,7 @@ socket.on("connect", async () => {
 });
 
 useInterval(() => {
-   socket.emit("room_ping");
+   socket.emit("student:room_ping");
 }, 60000);
 
 onMounted(async () => {

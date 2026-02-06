@@ -7,7 +7,8 @@ export const socket = new Promise<Socket>(async (resolve) => {
    let socket = io(import.meta.env.VITE_API_URL, {
       autoConnect: true,
       auth: {
-         "API-KEY": await window.api.getApiKey(),
+         API_KEY: await window.api.getApiKey(),
+         UUID: await window.api.getUuid(),
       },
    });
 

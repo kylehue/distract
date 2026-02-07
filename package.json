@@ -16,7 +16,7 @@
       "clean:app": "rimraf dist dist-electron",
       "clean:electron": "rimraf release",
       "preview": "vite preview",
-      "publish": "electron-builder --publish=always"
+      "publish": "npm run clean:electron && electron-builder --publish=always"
    },
    "dependencies": {
       "@fix-webm-duration/fix": "^1.0.1",

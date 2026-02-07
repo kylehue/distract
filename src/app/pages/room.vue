@@ -10,6 +10,11 @@
    </div>
    <template v-else-if="!room || !teacher || !student"> Missing data </template>
    <div v-else class="flex flex-col w-full h-full">
+      <NText
+         class="absolute left-2 bottom-1 text-xs pointer-events-none select-none opacity-25 font-mono"
+      >
+         {{ ping.latency }} ms
+      </NText>
       <div class="flex justify-between items-center">
          <div class="flex flex-col">
             <NText class="text-xs" depth="3">Host</NText>
@@ -72,11 +77,13 @@ import {
    OfflineMonitorQueue,
    type OfflineMonitorLog,
 } from "@/lib/offline-monitor-queue";
+import { usePing } from "../composables/use-ping";
 
 const router = useRouter();
 const route = useRoute();
 const socket = useSocket();
 const message = useMessage();
+const ping = usePing();
 
 const room = ref<RoomInfo>();
 const teacher = ref<TeacherInfo>();
@@ -187,7 +194,7 @@ socket.on("connect", async () => {
 });
 
 useInterval(() => {
-   socket.emit("student:room_ping");
+   socket.emit("student:keep_alive");
 }, 60000);
 
 onMounted(async () => {

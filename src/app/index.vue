@@ -13,7 +13,7 @@
       <NText
          class="absolute right-2 bottom-1 text-xs pointer-events-none select-none opacity-25 font-mono"
       >
-         {{ appVersion }}
+         v{{ appVersion }}
       </NText>
    </NConfigProvider>
 </template>

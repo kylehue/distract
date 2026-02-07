@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="utf-8"?>
+<svg version="1.1"
+   id="Layer_2"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:xlink="http://www.w3.org/1999/xlink"
+   viewBox="-315 80 329 450"
+   style="enable-background:new -315 80 329 450;"
+   xml:space="preserve">
+
+   <style type="text/css">
+      .faceFill { fill: url(#SVGID_1_); }
+
+      .eyesRig, .blink, .ballRig {
+         transform-box: fill-box;
+         transform-origin: center;
+      }
+
+      @keyframes watch {
+         0%, 50%, 100% { translate: -7px 0px; }
+         50.5%         { translate: 7px 0px; }
+         70.5%         { translate: 7px 0px; }
+         71%           { translate: -7px 0px; }
+      }
+
+      @keyframes blink {
+         0%, 4% { scale: 1 1; }
+         1%     { scale: 1 0; }
+      }
+
+      .eyesRig { animation: watch 12s linear infinite; }
+      .blink { animation: blink 5s ease-out infinite; }
+      .ballRig { animation: ball-animate 0.65s infinite linear; }
+
+      @keyframes ball-animate {
+         /* Fall and rise */
+         0%     { translate: 0px 0px; }
+         11.11% { translate: 0px 8px; }
+         22.22% { translate: 0px 28.8px; }
+         33.33% { translate: 0px 62.4px; }
+         44.44% { translate: 0px 62px; } 
+         55.55% { translate: 0px 27.6px; }
+         66.66% { translate: 0px 6px; }
+         77.77% { translate: 0px -4px; }
+         88.88% { translate: 0px 0px; }
+         100%   { translate: 0px 0px; }
+
+         /* Squish and stretch */
+         0%     { scale: 1 1; }
+         33.33% { scale: 0.9 1.1; }
+         44.44% { scale: 1.1 0.9; }
+         100%   { scale: 1 1; }
+      }
+   </style>
+
+   <defs>
+      <linearGradient id="SVGID_1_" gradientUnits="userSpaceOnUse"
+         x1="-151.2314" y1="265.0407" x2="-292.2314" y2="569.0407">
+         <stop offset="0" style="stop-color:#8661FF"/>
+         <stop offset="1" style="stop-color:#EE52F7"/>
+      </linearGradient>
+
+      <path id="facePath" d="M-146.6,165.5c-23.5,0-45.7,5.7-65.2,15.8l-10.9-17.1c5.1-5.1,8.2-12.1,8.2-19.9c0-15.6-12.6-28.2-28.2-28.2
+         c-15.6,0-28.2,12.6-28.2,28.2s12.6,28.2,28.2,28.2c2.4,0,4.6-0.3,6.8-0.9l11,17.3c-0.1,0-0.2,0.1-0.2,0.1
+         c-37.8,25.1-62.6,67.7-62.6,116.2c0,33.9,12.2,64.9,32.4,89.1c8.7,10.4-22.7,50.3-22.7,50.3s71-12.7,80.8-8.9
+         c15.7,6,32.8,9.3,50.7,9.3c78,0,141.2-62.6,141.2-139.7S-68.6,165.5-146.6,165.5z"/>
+
+      <path id="eyeLeft" d="M-168.8,304.7c-19.7,2.6-38.1-13.8-41-36.5
+         c-3-22.7,10.6-43.2,30.3-45.8c19.7-2.6,38.1,13.8,41,36.5
+         C-135.5,281.7-149.1,302.2-168.8,304.7z"/>
+
+      <path id="eyeRight" d="M-72.7,295.1
+         c-18.6,2.4-36-13-38.8-34.6c-2.8-21.5,10-40.9,28.6-43.4c18.6-2.4,36,13,38.8,34.6
+         C-41.2,273.2-54.1,292.6-72.7,295.1z"/>
+
+      <mask id="faceWithHoles">
+         <use href="#facePath" xlink:href="#facePath" fill="white"/>
+         <g class="eyesRig">
+         <g class="blink">
+            <use href="#eyeLeft"  xlink:href="#eyeLeft"  fill="black"/>
+            <use href="#eyeRight" xlink:href="#eyeRight" fill="black"/>
+         </g>
+         </g>
+      </mask>
+   </defs>
+
+   <g class="ballRig">
+      <use href="#facePath" xlink:href="#facePath" class="faceFill" mask="url(#faceWithHoles)"/>
+   </g>
+</svg>

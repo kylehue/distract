@@ -3,10 +3,7 @@
       v-if="isJoinRoomLoading"
       class="flex items-center justify-center w-full h-full"
    >
-      <div class="flex items-center gap-2">
-         <NSpin />
-         <NText>Loading...</NText>
-      </div>
+      <Loader text="Joining room..." />
    </div>
    <template v-else-if="!room || !teacher || !student"> Missing data </template>
    <div v-else class="flex flex-col w-full h-full">
@@ -66,7 +63,6 @@ import { onMounted, onBeforeUnmount, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useSocket } from "@/app/composables/use-socket";
 import type { RoomInfo, StudentInfo, TeacherInfo } from "@/lib/typings";
-import { useFetch } from "../composables/use-fetch";
 import {
    MONITOR_LOG_INTERVAL_MILLIS,
    MONITOR_LOG_NUMBER_OF_SAMPLES,
@@ -78,6 +74,7 @@ import {
    type OfflineMonitorLog,
 } from "@/lib/offline-monitor-queue";
 import { usePing } from "../composables/use-ping";
+import Loader from "../components/loader.vue";
 
 const router = useRouter();
 const route = useRoute();

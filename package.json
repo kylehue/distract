@@ -1,7 +1,7 @@
 {
    "name": "distract",
    "private": true,
-   "version": "0.0.4",
+   "version": "0.0.5",
    "type": "module",
    "scripts": {
       "dev": "concurrently \"npm run dev:py\" \"npm run dev:app\"",

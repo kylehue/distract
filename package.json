@@ -4,9 +4,8 @@
    "version": "0.0.5",
    "type": "module",
    "scripts": {
-      "dev": "concurrently \"npm run dev:py\" \"npm run dev:app\"",
+      "dev": "vite",
       "dev:py": "(if not exist py\\venv (python -m venv py\\venv)) && py\\venv\\Scripts\\python -m pip install -r py\\requirements.txt && py\\venv\\Scripts\\python py\\main.py",
-      "dev:app": "vite",
       "build": "npm run build:no-electron && npm run build:electron",
       "build:no-electron": "concurrently \"npm run build:py\" \"npm run build:app\"",
       "build:py": "npm run clean:py && py\\venv\\Scripts\\python -m PyInstaller py\\main.spec --distpath dist-py",

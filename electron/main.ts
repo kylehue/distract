@@ -89,7 +89,7 @@ if (!gotTheLock) {
       });
 
       if (VITE_DEV_SERVER_URL) {
-         splashWindow.loadURL(`${VITE_DEV_SERVER_URL}/splash.html`);
+         splashWindow.loadURL(`${VITE_DEV_SERVER_URL}/public/splash.html`);
       } else {
          splashWindow.loadFile(path.join(__dirname, "../dist/splash.html"));
       }

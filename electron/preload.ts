@@ -63,3 +63,9 @@ contextBridge.exposeInMainWorld("api", {
    cleanupTempMonitorLogs: () =>
       ipcRenderer.invoke("cleanup-temp-monitor-logs"),
 });
+
+contextBridge.exposeInMainWorld("splash", {
+   onStatus: (cb: (text: string) => void) => {
+      ipcRenderer.on("splash:status", (_e, text) => cb(text));
+   },
+});

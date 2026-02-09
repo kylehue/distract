@@ -67,8 +67,15 @@
                draggable="false"
             />
             <div class="title">Starting Distract</div>
-            <div class="subtitle">Warming things up...</div>
+            <div class="subtitle"></div>
          </div>
       </div>
+
+      <script defer>
+         window.splash?.onStatus((text) => {
+            const el = document.querySelector(".subtitle");
+            if (el) el.textContent = text;
+         });
+      </script>
    </body>
 </html>

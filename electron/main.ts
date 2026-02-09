@@ -11,6 +11,7 @@ import { setupWindowLock } from "./modules/window-lock";
 import { setupVersion } from "./modules/version";
 import { setupApiKey } from "./modules/api-key";
 import { setupTempFiles } from "./modules/temp-files";
+import { setupAutoUpdater } from "./modules/auto-updater";
 
 const APP_NAME = "Distract (Student Client)";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -50,59 +51,60 @@ if (!gotTheLock) {
    // Another instance is already running -> exit this one
    app.quit();
 } else {
-   let win: BrowserWindow | null;
-   let splash: BrowserWindow | null = null;
+   let mainWindow: BrowserWindow | null;
+   let splashWindow: BrowserWindow | null = null;
 
    // Handle second instance: focus the existing window
    app.on("second-instance", () => {
-      if (win) {
-         if (win.isMinimized()) win.restore();
-         win.focus();
+      if (mainWindow) {
+         if (mainWindow.isMinimized()) mainWindow.restore();
+         mainWindow.focus();
       }
    });
 
-   function createSplash() {
-      splash = new BrowserWindow({
+   function createSplashWindow() {
+      splashWindow = new BrowserWindow({
          width: 300,
-         height: 360,
+         height: 350,
          frame: false,
          resizable: false,
          movable: true,
-         alwaysOnTop: true,
+         alwaysOnTop: false,
          center: true,
          show: false,
          autoHideMenuBar: true,
          backgroundColor: "#101014",
          webPreferences: {
+            preload: path.join(__dirname, "preload.mjs"),
             contextIsolation: true,
             nodeIntegration: false,
             devTools: false,
          },
       });
 
-      splash.removeMenu();
+      splashWindow.removeMenu();
 
-      splash.webContents.on("did-fail-load", (_e, code, desc, url) => {
+      splashWindow.webContents.on("did-fail-load", (_e, code, desc, url) => {
          console.error("[splash] failed to load", { code, desc, url });
       });
 
       if (VITE_DEV_SERVER_URL) {
-         splash.loadURL(`${VITE_DEV_SERVER_URL}/splash.html`);
+         splashWindow.loadURL(`${VITE_DEV_SERVER_URL}/splash.html`);
       } else {
-         splash.loadFile(path.join(__dirname, "../dist/splash.html"));
+         splashWindow.loadFile(path.join(__dirname, "../dist/splash.html"));
       }
 
-      splash.show();
+      splashWindow.show();
 
-      splash.on("closed", () => {
-         splash = null;
+      splashWindow.on("closed", () => {
+         splashWindow = null;
       });
 
-      return splash;
+      return splashWindow;
    }
 
-   function createWindow() {
-      win = new BrowserWindow({
+   function createMainWindow() {
+      mainWindow = new BrowserWindow({
          icon: path.join(process.env.VITE_PUBLIC, "distract.ico"),
          show: false,
          webPreferences: {
@@ -119,41 +121,40 @@ if (!gotTheLock) {
       });
 
       // TODO: uncomment
-      // if (!IS_DEV) win.removeMenu();
+      // if (!IS_DEV) mainWindow.removeMenu();
 
       if (IS_DEV) {
-         win.webContents.openDevTools({ mode: "detach" });
+         mainWindow.webContents.openDevTools({ mode: "detach" });
       }
 
       // Test active push message to Renderer-process.
-      win.webContents.on("did-finish-load", () => {
-         win?.webContents.send(
+      mainWindow.webContents.on("did-finish-load", () => {
+         mainWindow?.webContents.send(
             "main-process-message",
             new Date().toLocaleString(),
          );
       });
 
-      return win;
+      return mainWindow;
    }
 
    function loadWindow() {
-      if (!win) return;
+      if (!mainWindow) return;
 
-      win.webContents.once("did-finish-load", () => {
-         win?.show();
-         if (splash && !splash.isDestroyed()) {
-            splash.close();
-            splash = null;
+      mainWindow.webContents.once("did-finish-load", () => {
+         mainWindow?.show();
+         if (splashWindow && !splashWindow.isDestroyed()) {
+            splashWindow.close();
+            splashWindow = null;
          }
       });
 
       if (VITE_DEV_SERVER_URL) {
-         win.loadURL(VITE_DEV_SERVER_URL);
+         mainWindow.loadURL(VITE_DEV_SERVER_URL);
       } else {
-         win.loadFile(path.join(__dirname, "../dist/index.html"));
+         mainWindow.loadFile(path.join(__dirname, "../dist/index.html"));
       }
    }
-
 
    // ---------------------------
    // App lifecycle
@@ -161,29 +162,32 @@ if (!gotTheLock) {
    app.on("window-all-closed", () => {
       if (process.platform !== "darwin") {
          app.quit();
-         win = null;
+         mainWindow = null;
       }
    });
 
    app.on("activate", () => {
       if (BrowserWindow.getAllWindows().length === 0) {
-         createWindow();
+         createMainWindow();
       }
    });
 
    app.whenReady().then(async () => {
-      createSplash();
-      win = createWindow();
-      await autoUpdater.checkForUpdatesAndNotify();
+      splashWindow = createSplashWindow();
+      await setupAutoUpdater(splashWindow);
+      mainWindow = createMainWindow();
 
       // setup modules
-      await setupPythonBridge(win);
+      splashWindow?.webContents.send("splash:status", "Robots are warming up...");
+      await setupPythonBridge(mainWindow);
+      splashWindow?.webContents.send("splash:status", "Wiring modules...");
       await setupUuid();
       await setupNotifications();
-      await setupWindowLock(win);
+      await setupWindowLock(mainWindow);
       await setupApiKey();
       await setupVersion();
       await setupTempFiles();
+      splashWindow?.webContents.send("splash:status", "Starting app...");
 
       // load after module setup
       loadWindow();

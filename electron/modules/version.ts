@@ -1,5 +1,5 @@
 import { ipcMain, app } from "electron";
 
-export function setupVersion() {
+export async function setupVersion() {
    ipcMain.handle("get-version", () => app.getVersion());
 }

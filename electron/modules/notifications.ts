@@ -4,7 +4,7 @@ function showNotification(title: string, body: string) {
    new Notification({ title, body }).show();
 }
 
-export function setupNotifications() {
+export async function setupNotifications() {
    ipcMain.handle("show-notification", (event, payload) => {
       showNotification(payload.title, payload.body);
    });

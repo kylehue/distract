@@ -126,26 +126,68 @@ def extract_frames_from_video(video_path: str, sample_count: int) -> list:
 
 
 def use_model(video_path: str, sample_count: int):
-    samples: List[List[int]] = []
+    try:
+        samples: List[List[int]] = []
 
-    frames = extract_frames_from_video(video_path, sample_count)
+        frames = extract_frames_from_video(video_path, sample_count)
 
-    for img in frames:
-        if img is None:
-            continue
-        img_for_phone_detection = img
+        for img in frames:
+            if img is None:
+                continue
+            img_for_phone_detection = img
+            features = extract_features_from_image(img)
+            model_input = [features.get(key, 0) for key in FEATURE_COLUMNS]
+            samples.append(model_input)
+
+        return {
+            "scores": extract_scores(samples),
+            "isPhonePresent": (
+                bool(detect_phone(img_for_phone_detection))
+                if img_for_phone_detection is not None
+                else False
+            ),
+        }
+    except Exception as e:
+        print(f"[use_model] error: {e}", flush=True)
+        return {
+            "scores": {
+                "integrity_score": 0,
+                "rf_score": 0,
+                "if_score": 0,
+                "feature_impacts": {},
+                "warning_level": WarningLevel.SEVERE.value,
+            },
+            "isPhonePresent": False,
+        }
+
+
+def warmup_model():
+    try:
+        # create a dummy image
+        img = cv2.rectangle(
+            cv2.cvtColor(
+                cv2.UMat(480, 640, cv2.CV_8UC3).get(),
+                cv2.COLOR_BGR2BGR,
+            ),
+            (200, 120),
+            (440, 360),
+            (255, 255, 255),
+            -1,
+        )
+
+        # warm feature extraction
         features = extract_features_from_image(img)
-        model_input = [features.get(key, 0) for key in FEATURE_COLUMNS]
-        samples.append(model_input)
 
-    return {
-        "scores": extract_scores(samples),
-        "isPhonePresent": (
-            bool(detect_phone(img_for_phone_detection))
-            if img_for_phone_detection is not None
-            else False
-        ),
-    }
+        # build a single fake model input row
+        model_input = [features.get(key, 0) for key in FEATURE_COLUMNS]
+
+        # warm sklearn + treeinterpreter
+        extract_scores([model_input])
+
+        # warm phone detector
+        detect_phone(img)
+    except Exception as e:
+        print(f"[warmup] error: {e}", flush=True)
 
 
 # --- Example usage ---

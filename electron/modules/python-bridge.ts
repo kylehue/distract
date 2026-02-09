@@ -73,18 +73,54 @@ function flushQueue() {
    global.__PY_PROC__.stdin.write(JSON.stringify(next.payload) + "\n");
 }
 
-export function setupPythonBridge(mainWindow: BrowserWindow) {
-   if (global.__PY_PROC__) return;
+function makeCid() {
+   return crypto.randomUUID();
+}
+
+function withTimeout<T>(
+   p: Promise<T>,
+   ms: number,
+   label = "timeout",
+): Promise<T> {
+   let t: NodeJS.Timeout | null = null;
+   const timeout = new Promise<T>((_resolve, reject) => {
+      t = setTimeout(() => reject(new Error(label)), ms);
+   });
+   return Promise.race([p, timeout]).finally(() => {
+      if (t) clearTimeout(t);
+   });
+}
+
+function invokePy(payload: any, timeoutMs = 15_000) {
+   const cid = payload.correlationId ?? makeCid();
+   const full = { ...payload, correlationId: cid };
+
+   return withTimeout(
+      new Promise((resolve, reject) => {
+         queue.push({ payload: full, resolve, reject });
+         flushQueue();
+      }),
+      timeoutMs,
+      `Python invoke timed out after ${timeoutMs}ms (${payload.type ?? "unknown"})`,
+   );
+}
+
+let bridgeInitialized = false;
+export async function setupPythonBridge(mainWindow: BrowserWindow) {
+   if (bridgeInitialized) return;
+   bridgeInitialized = true;
 
    const pyProc = startPython();
 
    pyProc.stdout.on("data", (data) => {
-      const lines = data.toString().trim().split("\n");
+      const lines = data.toString().split("\n");
 
       for (const line of lines) {
-         if (!line.trim()) continue;
+         const s = line.trim();
+         if (!s) continue;
+
          try {
-            const msg = JSON.parse(line);
+            const msg = JSON.parse(s);
 
             if (msg.correlationId && pending.has(msg.correlationId)) {
                pending.get(msg.correlationId)!.resolve(msg.value);
@@ -99,21 +135,36 @@ export function setupPythonBridge(mainWindow: BrowserWindow) {
                mainWindow.webContents.send(`py:${msg.type}`, msg);
             }
          } catch {
-            console.log("[python raw]", line);
+            console.log("[python raw]", s);
          }
       }
    });
 
+   pyProc.on("error", (err) => {
+      console.error("[python error]", err);
+   });
+
    ipcMain.handle("py-invoke", async (_evt, payload) => {
       if (!global.__PY_PROC__) throw new Error("Python not running");
-
-      return new Promise((resolve, reject) => {
-         queue.push({ payload, resolve, reject });
-         flushQueue();
-      });
+      return invokePy(payload);
    });
 
-   app.on("before-quit", () => {
-      stopPython();
-   });
+   app.on("before-quit", () => stopPython());
+
+   await warmupPython();
+}
+
+async function warmupPython() {
+   await app.whenReady();
+
+   // Send a warmup_model and wait for warmup_complete
+   const res = await invokePy({ type: "warmup_model" }, 1000 * 60 * 60);
+
+   if (res !== "warmup_complete") {
+      throw new Error(
+         `Python warmup failed: expected "warmup_complete", got ${JSON.stringify(res)}`,
+      );
+   }
+
+   console.log("[python] warmup OK");
 }

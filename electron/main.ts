@@ -51,6 +51,8 @@ if (!gotTheLock) {
    app.quit();
 } else {
    let win: BrowserWindow | null;
+   let splash: BrowserWindow | null = null;
+
    // Handle second instance: focus the existing window
    app.on("second-instance", () => {
       if (win) {
@@ -59,9 +61,50 @@ if (!gotTheLock) {
       }
    });
 
+   function createSplash() {
+      splash = new BrowserWindow({
+         width: 300,
+         height: 360,
+         frame: false,
+         resizable: false,
+         movable: true,
+         alwaysOnTop: true,
+         center: true,
+         show: false,
+         autoHideMenuBar: true,
+         backgroundColor: "#101014",
+         webPreferences: {
+            contextIsolation: true,
+            nodeIntegration: false,
+            devTools: false,
+         },
+      });
+
+      splash.removeMenu();
+
+      splash.webContents.on("did-fail-load", (_e, code, desc, url) => {
+         console.error("[splash] failed to load", { code, desc, url });
+      });
+
+      if (VITE_DEV_SERVER_URL) {
+         splash.loadURL(`${VITE_DEV_SERVER_URL}/splash.html`);
+      } else {
+         splash.loadFile(path.join(__dirname, "../dist/splash.html"));
+      }
+
+      splash.show();
+
+      splash.on("closed", () => {
+         splash = null;
+      });
+
+      return splash;
+   }
+
    function createWindow() {
       win = new BrowserWindow({
          icon: path.join(process.env.VITE_PUBLIC, "distract.ico"),
+         show: false,
          webPreferences: {
             preload: path.join(__dirname, "preload.mjs"),
             contextIsolation: true,
@@ -90,14 +133,27 @@ if (!gotTheLock) {
          );
       });
 
+      return win;
+   }
+
+   function loadWindow() {
+      if (!win) return;
+
+      win.webContents.once("did-finish-load", () => {
+         win?.show();
+         if (splash && !splash.isDestroyed()) {
+            splash.close();
+            splash = null;
+         }
+      });
+
       if (VITE_DEV_SERVER_URL) {
          win.loadURL(VITE_DEV_SERVER_URL);
       } else {
          win.loadFile(path.join(__dirname, "../dist/index.html"));
       }
-
-      return win;
    }
+
 
    // ---------------------------
    // App lifecycle
@@ -115,16 +171,21 @@ if (!gotTheLock) {
       }
    });
 
-   app.whenReady().then(() => {
+   app.whenReady().then(async () => {
+      createSplash();
       win = createWindow();
-      autoUpdater.checkForUpdatesAndNotify();
+      await autoUpdater.checkForUpdatesAndNotify();
+
       // setup modules
-      setupPythonBridge(win);
-      setupUuid();
-      setupNotifications();
-      setupWindowLock(win);
-      setupApiKey();
-      setupVersion();
-      setupTempFiles();
+      await setupPythonBridge(win);
+      await setupUuid();
+      await setupNotifications();
+      await setupWindowLock(win);
+      await setupApiKey();
+      await setupVersion();
+      await setupTempFiles();
+
+      // load after module setup
+      loadWindow();
    });
 }

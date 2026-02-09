@@ -83,7 +83,7 @@ function unlockWindow(win: BrowserWindow): void {
    win.removeAllListeners("close");
 }
 
-export function setupWindowLock(win: BrowserWindow) {
+export async function setupWindowLock(win: BrowserWindow) {
    ipcMain.handle("lock-window", () => {
       lockWindow(win);
    });

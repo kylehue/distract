@@ -255,8 +255,10 @@ watch(
 
       if (room.value?.status === "monitoring" && student.value?.permitted) {
          webcamRecorder.startRecording();
+         window.api.setShowCloseWarningDialog(true);
       } else {
          webcamRecorder.stopRecording();
+         window.api.setShowCloseWarningDialog(false);
       }
    },
    { immediate: true },

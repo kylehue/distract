@@ -62,6 +62,8 @@ contextBridge.exposeInMainWorld("api", {
       ipcRenderer.invoke("delete-temp-monitor-log", filePath),
    cleanupTempMonitorLogs: () =>
       ipcRenderer.invoke("cleanup-temp-monitor-logs"),
+   setShowCloseWarningDialog: (value: boolean) =>
+      ipcRenderer.invoke("set-show-close-warning-dialog", value),
 });
 
 contextBridge.exposeInMainWorld("splash", {

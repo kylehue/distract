@@ -12,6 +12,7 @@ import { setupVersion } from "./modules/version";
 import { setupApiKey } from "./modules/api-key";
 import { setupTempFiles } from "./modules/temp-files";
 import { setupAutoUpdater } from "./modules/auto-updater";
+import { setupCloseDialog } from "./modules/close-dialog";
 
 const APP_NAME = "Distract (Student Client)";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -206,6 +207,7 @@ if (!gotTheLock) {
       await setupApiKey();
       await setupVersion();
       await setupTempFiles();
+      await setupCloseDialog(mainWindow);
       splashWindow?.webContents.send("splash:status", "Starting app...");
 
       // load after module setup

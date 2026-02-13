@@ -46,6 +46,7 @@ interface Window {
       getTempMonitorLogs: () => Promise<{ filePath: string; data: any }[]>;
       deleteTempMonitorLog: (filePath: string) => Promise<void>;
       cleanupTempMonitorLogs: () => Promise<void>;
+      setShowCloseWarningDialog: (value: boolean) => Promise<void>;
    };
    splash: {
       onStatus: (cb: (text: string) => void) => void;

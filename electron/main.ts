@@ -53,6 +53,7 @@ if (!gotTheLock) {
 } else {
    let mainWindow: BrowserWindow | null;
    let splashWindow: BrowserWindow | null = null;
+   let splashWindowReady = false;
 
    // Handle second instance: focus the existing window
    app.on("second-instance", () => {
@@ -65,7 +66,7 @@ if (!gotTheLock) {
    function createSplashWindow() {
       splashWindow = new BrowserWindow({
          width: 300,
-         height: 350,
+         height: 340,
          frame: false,
          resizable: false,
          movable: true,
@@ -94,7 +95,20 @@ if (!gotTheLock) {
          splashWindow.loadFile(path.join(__dirname, "../dist/splash.html"));
       }
 
-      splashWindow.show();
+      splashWindow.once("ready-to-show", () => splashWindow?.show());
+
+      let isQuitting = false;
+
+      splashWindow.on("close", (e) => {
+         // app closes splash when ready
+         if (splashWindowReady) return;
+
+         // if we're already quitting, don't block the close
+         if (isQuitting) return;
+         isQuitting = true;
+
+         app.quit();
+      });
 
       splashWindow.on("closed", () => {
          splashWindow = null;
@@ -138,13 +152,15 @@ if (!gotTheLock) {
       return mainWindow;
    }
 
-   function loadWindow() {
+   function loadMainWindow() {
       if (!mainWindow) return;
 
       mainWindow.webContents.once("did-finish-load", () => {
          mainWindow?.show();
          if (splashWindow && !splashWindow.isDestroyed()) {
+            splashWindowReady = true;
             splashWindow.close();
+            splashWindowReady = false;
             splashWindow = null;
          }
       });
@@ -178,7 +194,10 @@ if (!gotTheLock) {
       mainWindow = createMainWindow();
 
       // setup modules
-      splashWindow?.webContents.send("splash:status", "Robots are warming up...");
+      splashWindow?.webContents.send(
+         "splash:status",
+         "Robots are warming up...",
+      );
       await setupPythonBridge(mainWindow);
       splashWindow?.webContents.send("splash:status", "Wiring modules...");
       await setupUuid();
@@ -190,6 +209,6 @@ if (!gotTheLock) {
       splashWindow?.webContents.send("splash:status", "Starting app...");
 
       // load after module setup
-      loadWindow();
+      loadMainWindow();
    });
 }

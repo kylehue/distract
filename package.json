@@ -5,6 +5,8 @@
    "type": "module",
    "scripts": {
       "dev": "vite",
+      "test": "vitest run",
+      "test:watch": "vitest",
       "dev:py": "(if not exist py\\venv (python -m venv py\\venv)) && py\\venv\\Scripts\\python -m pip install -r py\\requirements.txt && py\\venv\\Scripts\\python py\\main.py",
       "build": "npm run build:no-electron && npm run build:electron",
       "build:no-electron": "concurrently \"npm run build:py\" \"npm run build:app\"",
@@ -29,15 +31,18 @@
       "vue-router": "^4.5.1"
    },
    "devDependencies": {
+      "@vue/test-utils": "^2.4.6",
       "@types/mime-types": "^3.0.1",
       "@vitejs/plugin-vue": "^5.0.4",
       "concurrently": "^9.2.1",
+      "jsdom": "^24.1.3",
       "electron": "^30.0.1",
       "electron-builder": "^24.13.3",
       "electron-updater": "^6.7.3",
       "naive-ui": "^2.42.0",
       "rimraf": "^5.0.10",
       "typescript": "^5.2.2",
+      "vitest": "^2.1.8",
       "vfonts": "^0.0.3",
       "vite": "^5.1.6",
       "vite-plugin-electron": "^0.28.6",

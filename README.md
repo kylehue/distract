@@ -1,6 +1,6 @@
-# DISTRACT
+# Distract (Student Client)
 
-Detecting Inattentiveness in Students Through Remote Assessment using Computer Tracking
+The student client for Distract application.
 
 ### Contributor Notes
 

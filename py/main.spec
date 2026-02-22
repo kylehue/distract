@@ -7,9 +7,6 @@ from PyInstaller.utils.hooks import collect_data_files
 mediapipe_datas = collect_data_files("mediapipe", include_py_files=True)
 datas = []
 datas += mediapipe_datas
-datas += [
-    ("models", "py/models"),
-]
 
 block_cipher = None
 

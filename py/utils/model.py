@@ -1,27 +1,17 @@
-from typing import List, Optional
+from typing import List
 import cv2
-import joblib
 import pandas as pd
 from detectors.main import extract_features_from_image
 from detectors.phone import detect_phone
+from utils.model_loader import load_if_model, load_rf_model
 from utils.enum import WarningLevel
 import random
 from treeinterpreter import treeinterpreter as ti
-import os
-import sys
-
-
-def resource_path(relative_path: str) -> str:
-    if hasattr(sys, "_MEIPASS"):
-        return os.path.join(sys._MEIPASS, relative_path)
-    return os.path.abspath(relative_path)
 
 
 # Load models
-random_forest_model = joblib.load(resource_path("py/models/random_forest_model.pkl"))
-isolation_forest_model = joblib.load(
-    resource_path("py/models/isolation_forest_model.pkl")
-)
+random_forest_model = load_rf_model()
+isolation_forest_model = load_if_model()
 
 FEATURE_COLUMNS = [
     "face_x",
@@ -165,10 +155,7 @@ def warmup_model():
     try:
         # create a dummy image
         img = cv2.rectangle(
-            cv2.cvtColor(
-                cv2.UMat(480, 640, cv2.CV_8UC3).get(),
-                cv2.COLOR_BGR2BGR,
-            ),
+            cv2.UMat(480, 640, cv2.CV_8UC3).get(),
             (200, 120),
             (440, 360),
             (255, 255, 255),

@@ -1,6 +1,6 @@
 import type { useSocket } from "@/app/composables/use-socket";
 
-export type OfflineMonitorLog = {
+export type MonitorPayload = {
    uuid: string;
    transactionId: string;
    roomCode: string;
@@ -22,7 +22,7 @@ export type BulkAck = {
    failed: { transactionId: string; error: string }[];
 };
 
-export class OfflineMonitorQueue {
+export class MonitorQueue {
    private recordingMap = new Map<string, Blob>();
    private videoPathMap = new Map<string, string>();
 
@@ -57,10 +57,10 @@ export class OfflineMonitorQueue {
 
    /**
     * Create and send (or queue) a monitor log.
-    * 
+    *
     * Note: This does NOT upload the video; server triggers that separately via upload URL.
     */
-   async sendOrQueueLog(payload: OfflineMonitorLog): Promise<void> {
+   async sendOrQueueLog(payload: MonitorPayload): Promise<void> {
       if (!this.socket.isConnected.value) {
          await window.api.writeTempMonitorLog(payload);
          return;

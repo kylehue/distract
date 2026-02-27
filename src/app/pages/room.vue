@@ -70,9 +70,9 @@ import {
 import { useWebcamRecorder } from "../composables/use-webcam-recorder";
 import { useInterval } from "../composables/use-interval";
 import {
-   OfflineMonitorQueue,
-   type OfflineMonitorLog,
-} from "@/lib/offline-monitor-queue";
+   MonitorQueue,
+   type MonitorPayload,
+} from "@/lib/monitor-queue";
 import { usePing } from "../composables/use-ping";
 import Loader from "../components/loader.vue";
 
@@ -92,7 +92,7 @@ const webcamRecorder = useWebcamRecorder({
    chunkIntervalMillis: MONITOR_LOG_INTERVAL_MILLIS,
 });
 
-const offline = new OfflineMonitorQueue(socket);
+const monitorQueue = new MonitorQueue(socket);
 
 async function joinRoom() {
    isJoinRoomLoading.value = true;
@@ -128,7 +128,7 @@ async function leaveRoom() {
    isLeaveRoomLoading.value = true;
    try {
       webcamRecorder.stopRecording();
-      offline.clearMemoryOnly();
+      monitorQueue.clearMemoryOnly();
       await socket.emitWithAck("student:leave_room", {}, 5000);
       router.push("/");
    } catch {
@@ -148,11 +148,11 @@ webcamRecorder.onClipReady(async (clip) => {
    const transactionId = crypto.randomUUID();
 
    // keep memory blob for fast upload
-   offline.rememberRecording(transactionId, clip.blob);
+   monitorQueue.rememberRecording(transactionId, clip.blob);
 
    // always persist to disk for offline/restart-safe evidence upload
    const videoPath = await window.api.writeTempVideo(clip.blob);
-   offline.rememberVideoPath(transactionId, videoPath);
+   monitorQueue.rememberVideoPath(transactionId, videoPath);
 
    try {
       const modelResults = await window.api.pyInvoke("use_model", {
@@ -160,7 +160,7 @@ webcamRecorder.onClipReady(async (clip) => {
          sampleCount: MONITOR_LOG_NUMBER_OF_SAMPLES,
       });
 
-      const payload: OfflineMonitorLog = {
+      const payload: MonitorPayload = {
          uuid,
          transactionId,
          roomCode,
@@ -172,7 +172,7 @@ webcamRecorder.onClipReady(async (clip) => {
          createdAt: new Date().toISOString(),
       };
 
-      await offline.sendOrQueueLog(payload);
+      await monitorQueue.sendOrQueueLog(payload);
    } catch (e) {
       console.error("Failed to process/upload monitor log:", e);
       let errorMsg =
@@ -188,7 +188,7 @@ webcamRecorder.onClipReady(async (clip) => {
 // video follow-up
 socket.on("student:upload_recording_url", async (data) => {
    if (!student.value?.permitted) return;
-   await offline.handleUploadRecordingUrl({
+   await monitorQueue.handleUploadRecordingUrl({
       transactionId: data.transactionId,
       url: data.url,
    });
@@ -198,7 +198,7 @@ socket.on("student:upload_recording_url", async (data) => {
 socket.on("connect", async () => {
    console.log("Rejoining room...");
    await joinRoom();
-   await offline.flushQueuedLogs();
+   await monitorQueue.flushQueuedLogs();
 });
 
 useInterval(() => {
@@ -209,8 +209,8 @@ onMounted(async () => {
    await joinRoom();
 
    // flush once on mount too (connect could have fired already)
-   await offline.hydrateFromDisk();
-   await offline.flushQueuedLogs();
+   await monitorQueue.hydrateFromDisk();
+   await monitorQueue.flushQueuedLogs();
 });
 
 onBeforeUnmount(() => {

@@ -41,10 +41,16 @@ export function startPython() {
    proc.on("exit", (code, signal) => {
       console.log("[python exit]", { code, signal });
       global.__PY_PROC__ = null;
+      rejectAllPending(
+         new Error(
+            `Python process exited (code=${String(code)}, signal=${String(signal)})`,
+         ),
+      );
    });
 
    proc.on("error", (err) => {
       console.error("[python error]", err);
+      rejectAllPending(new Error(`Python process error: ${err.message}`));
    });
 
    global.__PY_PROC__ = proc;
@@ -54,10 +60,12 @@ export function startPython() {
 type PendingResolver = {
    resolve: (v: any) => void;
    reject: (e: any) => void;
+   timeout: NodeJS.Timeout;
 };
 
 type QueuedRequest = {
    payload: any;
+   timeoutMs: number;
    resolve: (v: any) => void;
    reject: (e: any) => void;
 };
@@ -65,12 +73,73 @@ type QueuedRequest = {
 const pending = new Map<string, PendingResolver>();
 const queue: QueuedRequest[] = [];
 let activeCorrelationId: string | null = null;
+let bridgeWindow: BrowserWindow | null = null;
+const wiredProcesses = new WeakSet<ChildProcessWithoutNullStreams>();
 
 function rejectAllPending(err: Error) {
-   for (const [, pr] of pending) pr.reject(err);
+   for (const [, pr] of pending) {
+      clearTimeout(pr.timeout);
+      pr.reject(err);
+   }
    pending.clear();
+
+   for (const req of queue) {
+      req.reject(err);
+   }
    queue.length = 0;
    activeCorrelationId = null;
+}
+
+function handlePythonMessage(msg: any) {
+   if (msg.correlationId && pending.has(msg.correlationId)) {
+      const pr = pending.get(msg.correlationId)!;
+      clearTimeout(pr.timeout);
+      pr.resolve(msg.value);
+      pending.delete(msg.correlationId);
+
+      activeCorrelationId = null;
+      flushQueue();
+      return;
+   }
+
+   if (msg.type && bridgeWindow && !bridgeWindow.isDestroyed()) {
+      bridgeWindow.webContents.send(`py:${msg.type}`, msg);
+   }
+}
+
+function wirePythonOutput(proc: ChildProcessWithoutNullStreams) {
+   if (wiredProcesses.has(proc)) return;
+   wiredProcesses.add(proc);
+
+   let stdoutBuffer = "";
+   proc.stdout.on("data", (data) => {
+      stdoutBuffer += data.toString();
+      const lines = stdoutBuffer.split(/\r?\n/);
+      stdoutBuffer = lines.pop() ?? "";
+
+      for (const line of lines) {
+         const s = line.trim();
+         if (!s) continue;
+
+         try {
+            const msg = JSON.parse(s);
+            handlePythonMessage(msg);
+         } catch {
+            console.log("[python raw]", s);
+         }
+      }
+   });
+}
+
+function ensurePythonRunning() {
+   if (global.__PY_PROC__) return global.__PY_PROC__;
+   if (!bridgeWindow) {
+      throw new Error("Python bridge has not been initialized");
+   }
+
+   const proc = startPython();
+   wirePythonOutput(proc);
+   return proc;
 }
 
 function flushQueue() {
@@ -82,30 +151,61 @@ function flushQueue() {
    const cid = next.payload.correlationId;
 
    activeCorrelationId = cid;
-   pending.set(cid, { resolve: next.resolve, reject: next.reject });
+   const timeout = setTimeout(() => {
+      void onInvokeTimeout(cid, next.timeoutMs, next.payload.type);
+   }, next.timeoutMs);
+   pending.set(cid, {
+      resolve: next.resolve,
+      reject: next.reject,
+      timeout,
+   });
 
    try {
       global.__PY_PROC__.stdin.write(JSON.stringify(next.payload) + "\n");
    } catch (e) {
+      const pr = pending.get(cid);
+      if (pr) {
+         clearTimeout(pr.timeout);
+      }
+
       // If stdin is broken, fail fast
       pending.get(cid)?.reject(e);
       pending.delete(cid);
       activeCorrelationId = null;
+
+      void terminatePython({
+         force: true,
+         reason: "Python stdin write failed",
+      });
+
       flushQueue();
    }
 }
 
-function withTimeout<T>(
-   p: Promise<T>,
-   ms: number,
-   label = "timeout",
-): Promise<T> {
-   let t: NodeJS.Timeout | null = null;
-   const timeout = new Promise<T>((_resolve, reject) => {
-      t = setTimeout(() => reject(new Error(label)), ms);
-   });
-   return Promise.race([p, timeout]).finally(() => {
-      if (t) clearTimeout(t);
+async function onInvokeTimeout(
+   correlationId: string,
+   timeoutMs: number,
+   type: string,
+) {
+   const pr = pending.get(correlationId);
+   if (!pr) return;
+
+   clearTimeout(pr.timeout);
+   pending.delete(correlationId);
+   if (activeCorrelationId === correlationId) {
+      activeCorrelationId = null;
+   }
+
+   pr.reject(
+      new Error(
+         `Python invoke timed out after ${timeoutMs}ms (${type ?? "unknown"})`,
+      ),
+   );
+
+   // Hard reset the process so a wedged python call cannot block future invokes.
+   await terminatePython({
+      force: true,
+      reason: `Python invoke timed out after ${timeoutMs}ms (${type ?? "unknown"})`,
    });
 }
 
@@ -113,21 +213,17 @@ function invokePy(payload: any, timeoutMs = 15_000) {
    const cid = payload.correlationId ?? crypto.randomUUID();
    const full = { ...payload, correlationId: cid };
 
-   const base = new Promise((resolve, reject) => {
-      queue.push({ payload: full, resolve, reject });
-      flushQueue();
-   });
+   if (
+      activeCorrelationId === cid ||
+      pending.has(cid) ||
+      queue.some((q) => q.payload.correlationId === cid)
+   ) {
+      throw new Error(`Duplicate Python correlationId: ${cid}`);
+   }
 
-   return withTimeout(
-      base,
-      timeoutMs,
-      `Python invoke timed out after ${timeoutMs}ms (${payload.type ?? "unknown"})`,
-   ).catch((e) => {
-      // IMPORTANT: cleanup so the bridge doesn't get stuck after a timeout
-      if (pending.has(cid)) pending.delete(cid);
-      if (activeCorrelationId === cid) activeCorrelationId = null;
+   return new Promise((resolve, reject) => {
+      queue.push({ payload: full, timeoutMs, resolve, reject });
       flushQueue();
-      throw e;
    });
 }
 
@@ -184,10 +280,12 @@ export async function terminatePython(opts?: {
       try {
          if (process.platform === "win32") {
             // Kill process tree, force
-            spawnChild("taskkill", ["/PID", String(proc.pid), "/T", "/F"], {
-               windowsHide: true,
-               stdio: "ignore",
-            });
+            if (proc.pid) {
+               spawnChild("taskkill", ["/PID", String(proc.pid), "/T", "/F"], {
+                  windowsHide: true,
+                  stdio: "ignore",
+               });
+            }
          } else {
             // Prefer killing process group if detached
             try {
@@ -213,40 +311,11 @@ export async function setupPythonBridge(mainWindow: BrowserWindow) {
    if (bridgeInitialized) return;
    bridgeInitialized = true;
 
-   const pyProc = startPython();
-
-   pyProc.stdout.on("data", (data) => {
-      const lines = data.toString().split("\n");
-
-      for (const line of lines) {
-         const s = line.trim();
-         if (!s) continue;
-
-         try {
-            const msg = JSON.parse(s);
-
-            // reply to invokePy
-            if (msg.correlationId && pending.has(msg.correlationId)) {
-               pending.get(msg.correlationId)!.resolve(msg.value);
-               pending.delete(msg.correlationId);
-
-               activeCorrelationId = null;
-               flushQueue();
-               continue;
-            }
-
-            // push event to renderer
-            if (msg.type) {
-               mainWindow.webContents.send(`py:${msg.type}`, msg);
-            }
-         } catch {
-            console.log("[python raw]", s);
-         }
-      }
-   });
+   bridgeWindow = mainWindow;
+   ensurePythonRunning();
 
    ipcMain.handle("py-invoke", async (_evt, payload) => {
-      if (!global.__PY_PROC__) throw new Error("Python not running");
+      ensurePythonRunning();
       return invokePy(payload);
    });
 
@@ -270,6 +339,7 @@ export async function setupPythonBridge(mainWindow: BrowserWindow) {
 
 async function warmupPython() {
    await app.whenReady();
+   ensurePythonRunning();
 
    // warmup can take long, timeout is 1 hour
    const res = await invokePy({ type: "warmup_model" }, 1000 * 60 * 60);

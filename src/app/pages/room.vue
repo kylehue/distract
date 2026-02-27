@@ -154,24 +154,35 @@ webcamRecorder.onClipReady(async (clip) => {
    const videoPath = await window.api.writeTempVideo(clip.blob);
    offline.rememberVideoPath(transactionId, videoPath);
 
-   const modelResults = await window.api.pyInvoke("use_model", {
-      videoPath,
-      sampleCount: MONITOR_LOG_NUMBER_OF_SAMPLES,
-   });
+   try {
+      const modelResults = await window.api.pyInvoke("use_model", {
+         videoPath,
+         sampleCount: MONITOR_LOG_NUMBER_OF_SAMPLES,
+      });
 
-   const payload: OfflineMonitorLog = {
-      uuid,
-      transactionId,
-      roomCode,
-      scores: modelResults.scores,
-      isPhonePresent: modelResults.isPhonePresent,
-      mimetype: clip.blob.type.split(";")[0],
-      startTime: new Date(clip.startTime).toISOString(),
-      videoPath,
-      createdAt: new Date().toISOString(),
-   };
+      const payload: OfflineMonitorLog = {
+         uuid,
+         transactionId,
+         roomCode,
+         scores: modelResults.scores,
+         isPhonePresent: modelResults.isPhonePresent,
+         mimetype: clip.blob.type.split(";")[0],
+         startTime: new Date(clip.startTime).toISOString(),
+         videoPath,
+         createdAt: new Date().toISOString(),
+      };
 
-   await offline.sendOrQueueLog(payload);
+      await offline.sendOrQueueLog(payload);
+   } catch (e) {
+      console.error("Failed to process/upload monitor log:", e);
+      let errorMsg =
+         "Something went wrong while processing monitoring data. Please restart the application if the problem persists.";
+      message.error(errorMsg);
+      window.api.showNotification({
+         title: "Monitoring Error",
+         body: errorMsg,
+      });
+   }
 });
 
 // video follow-up

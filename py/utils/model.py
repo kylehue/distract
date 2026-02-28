@@ -4,7 +4,6 @@ import pandas as pd
 from detectors.main import extract_features_from_image
 from detectors.phone import detect_phone
 from utils.model_loader import load_if_model, load_rf_model
-from utils.enum import WarningLevel
 import random
 from treeinterpreter import treeinterpreter as ti
 
@@ -59,29 +58,15 @@ def if_predict(data: List[List[int]]) -> dict:
     }
 
 
-def classify_score_to_warning_level(integrity_score: float) -> WarningLevel:
-    if integrity_score >= 0.6:
-        return WarningLevel.NONE.value
-    if integrity_score >= 0.4:
-        return WarningLevel.LOW.value
-    if integrity_score >= 0.2:
-        return WarningLevel.MODERATE.value
-    return WarningLevel.SEVERE.value
-
-
 def extract_scores(samples: List[List[int]]) -> dict:
     # Run predictions concurrently in threads
     if_pred = if_predict(samples)
     rf_pred = rf_predict(samples)
 
-    integrity_score = (rf_pred["score"] * 0.7) + (if_pred["score"] * 0.3)
-
     return {
-        "integrity_score": integrity_score,
         "rf_score": rf_pred["score"],
         "if_score": if_pred["score"],
         "feature_impacts": rf_pred["feature_impacts"],
-        "warning_level": classify_score_to_warning_level(integrity_score),
     }
 
 
@@ -141,11 +126,9 @@ def use_model(video_path: str, sample_count: int):
         print(f"[use_model] error: {e}", flush=True)
         return {
             "scores": {
-                "integrity_score": 0,
                 "rf_score": 0,
                 "if_score": 0,
                 "feature_impacts": {},
-                "warning_level": WarningLevel.SEVERE.value,
             },
             "isPhonePresent": False,
         }

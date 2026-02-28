@@ -64,6 +64,9 @@ contextBridge.exposeInMainWorld("api", {
       ipcRenderer.invoke("cleanup-temp-monitor-logs"),
    setShowCloseWarningDialog: (value: boolean) =>
       ipcRenderer.invoke("set-show-close-warning-dialog", value),
+   getTheme: (): Promise<"light" | "dark"> => ipcRenderer.invoke("get-theme"),
+   setTheme: (mode: "light" | "dark"): Promise<"light" | "dark"> =>
+      ipcRenderer.invoke("set-theme", mode),
 });
 
 contextBridge.exposeInMainWorld("splash", {

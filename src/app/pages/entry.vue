@@ -39,27 +39,37 @@
             Join room
          </NButton>
       </NForm>
+      <NText
+         class="absolute left-2 bottom-1 text-xs pointer-events-none select-none font-mono"
+         :depth="3"
+      >
+         v{{ appVersion }}
+      </NText>
+      <ThemeSwitch class="!absolute bottom-1 right-1" />
    </div>
 </template>
 
 <script setup lang="ts">
-import { ref } from "vue";
-import { NButton, NInput, NForm, NFormItem, useMessage } from "naive-ui";
+import { onMounted, ref } from "vue";
+import { NButton, NInput, NForm, NFormItem, NText, useMessage } from "naive-ui";
 import { PhHouseSimple, PhUser } from "@phosphor-icons/vue";
 import { useRouter } from "vue-router";
 import { RoomInfo, StudentInfo } from "@/lib/typings";
 import { useSocket } from "../composables/use-socket";
+import ThemeSwitch from "../components/theme-switch.vue";
 
 const router = useRouter();
+const message = useMessage();
+const socket = useSocket();
 const studentName = ref("");
 const studentNameStatus = ref<"error" | "success">("success");
 const studentNameFeedback = ref("");
 const roomCode = ref("");
 const roomCodeStatus = ref<"error" | "success">("success");
 const roomCodeFeedback = ref("");
-const message = useMessage();
-const socket = useSocket();
+const appVersion = ref("");
 const isLoading = ref(false);
+
 async function joinRoom() {
    studentNameStatus.value = "success";
    studentNameFeedback.value = "";
@@ -72,10 +82,14 @@ async function joinRoom() {
          room: RoomInfo;
          student: StudentInfo;
          fieldErrors?: Record<string, string>;
-      }>("student:join_room", {
-         studentName: studentName.value,
-         roomCode: roomCode.value,
-      }, 5000);
+      }>(
+         "student:join_room",
+         {
+            studentName: studentName.value,
+            roomCode: roomCode.value,
+         },
+         5000,
+      );
 
       if (data.fieldErrors) throw { fieldErrors: data.fieldErrors };
 
@@ -106,4 +120,8 @@ async function joinRoom() {
       isLoading.value = false;
    }
 }
+
+onMounted(async () => {
+   appVersion.value = await window.api.getVersion();
+});
 </script>

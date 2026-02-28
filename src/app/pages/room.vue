@@ -8,7 +8,8 @@
    <template v-else-if="!room || !teacher || !student"> Missing data </template>
    <div v-else class="flex flex-col w-full h-full">
       <NText
-         class="absolute left-2 bottom-1 text-xs pointer-events-none select-none opacity-25 font-mono"
+         class="absolute left-2 bottom-1 text-xs pointer-events-none select-none font-mono"
+         :depth="3"
       >
          {{ ping.latency }} ms
       </NText>
@@ -69,10 +70,7 @@ import {
 } from "@/lib/constants";
 import { useWebcamRecorder } from "../composables/use-webcam-recorder";
 import { useInterval } from "../composables/use-interval";
-import {
-   MonitorQueue,
-   type MonitorPayload,
-} from "@/lib/monitor-queue";
+import { MonitorQueue, type MonitorPayload } from "@/lib/monitor-queue";
 import { usePing } from "../composables/use-ping";
 import Loader from "../components/loader.vue";
 

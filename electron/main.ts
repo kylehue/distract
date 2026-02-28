@@ -13,6 +13,7 @@ import { setupApiKey } from "./modules/api-key";
 import { setupTempFiles } from "./modules/temp-files";
 import { setupAutoUpdater } from "./modules/auto-updater";
 import { setupCloseDialog } from "./modules/close-dialog";
+import { setupTheme } from "./modules/theme";
 
 const APP_NAME = "Distract (Student Client)";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -132,7 +133,6 @@ if (!gotTheLock) {
          width: 600,
          height: 400,
          title: APP_NAME,
-         darkTheme: true,
       });
 
       // TODO: uncomment
@@ -208,6 +208,7 @@ if (!gotTheLock) {
       await setupVersion();
       await setupTempFiles();
       await setupCloseDialog(mainWindow);
+      await setupTheme();
       splashWindow?.webContents.send("splash:status", "Starting app...");
 
       // load after module setup

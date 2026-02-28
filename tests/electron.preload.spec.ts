@@ -74,6 +74,11 @@ describe("electron/preload", () => {
          expect.any(Buffer),
          "video/webm",
       );
+
+      await api.getTheme();
+      await api.setTheme("dark");
+      expect(ipcRenderer.invoke).toHaveBeenCalledWith("get-theme");
+      expect(ipcRenderer.invoke).toHaveBeenCalledWith("set-theme", "dark");
    });
 
    it("routes on/off and splash status listeners to ipcRenderer channels", async () => {

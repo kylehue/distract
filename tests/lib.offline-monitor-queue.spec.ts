@@ -1,9 +1,9 @@
 import { ref } from "vue";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
-   OfflineMonitorQueue,
-   type OfflineMonitorLog,
-} from "@/lib/offline-monitor-queue";
+   MonitorQueue,
+   type MonitorPayload,
+} from "@/lib/monitor-queue";
 
 function createSocket(isOnline = true) {
    return {
@@ -12,7 +12,7 @@ function createSocket(isOnline = true) {
    };
 }
 
-function samplePayload(tx = "tx-1"): OfflineMonitorLog {
+function samplePayload(tx = "tx-1"): MonitorPayload {
    return {
       uuid: "uuid-1",
       transactionId: tx,
@@ -26,7 +26,7 @@ function samplePayload(tx = "tx-1"): OfflineMonitorLog {
    };
 }
 
-describe("OfflineMonitorQueue", () => {
+describe("MonitorQueue", () => {
    beforeEach(() => {
       window.api.getTempMonitorLogs = vi.fn().mockResolvedValue([]);
       window.api.writeTempMonitorLog = vi.fn().mockResolvedValue("queued.json");
@@ -39,7 +39,7 @@ describe("OfflineMonitorQueue", () => {
 
    it("hydrates only entries that contain both transactionId and videoPath", async () => {
       const socket = createSocket();
-      const queue = new OfflineMonitorQueue(socket as any);
+      const queue = new MonitorQueue(socket as any);
 
       (window.api.getTempMonitorLogs as any).mockResolvedValueOnce([
          { data: { transactionId: "tx-ok", videoPath: "C:/tmp/ok.webm" } },
@@ -56,7 +56,7 @@ describe("OfflineMonitorQueue", () => {
 
    it("queues monitor logs when offline", async () => {
       const socket = createSocket(false);
-      const queue = new OfflineMonitorQueue(socket as any);
+      const queue = new MonitorQueue(socket as any);
 
       await queue.sendOrQueueLog(samplePayload());
 
@@ -72,7 +72,7 @@ describe("OfflineMonitorQueue", () => {
          ok: true,
          shouldUploadVideo: false,
       });
-      const queue = new OfflineMonitorQueue(socket as any);
+      const queue = new MonitorQueue(socket as any);
       const cleanupSpy = vi.spyOn(queue, "cleanupTransaction");
 
       await queue.sendOrQueueLog(samplePayload("tx-clean"));
@@ -87,7 +87,7 @@ describe("OfflineMonitorQueue", () => {
    it("falls back to disk queue when online emit throws", async () => {
       const socket = createSocket(true);
       socket.emitWithAck.mockRejectedValue(new Error("socket down"));
-      const queue = new OfflineMonitorQueue(socket as any);
+      const queue = new MonitorQueue(socket as any);
 
       await queue.sendOrQueueLog(samplePayload("tx-retry"));
 
@@ -98,7 +98,7 @@ describe("OfflineMonitorQueue", () => {
 
    it("flushes queued logs by chunk and deletes only accepted file paths", async () => {
       const socket = createSocket(true);
-      const queue = new OfflineMonitorQueue(socket as any);
+      const queue = new MonitorQueue(socket as any);
 
       (window.api.getTempMonitorLogs as any).mockResolvedValueOnce([
          { filePath: "a.json", data: samplePayload("a") },
@@ -135,7 +135,7 @@ describe("OfflineMonitorQueue", () => {
 
    it("stops flushing on first bulk error to retry later", async () => {
       const socket = createSocket(true);
-      const queue = new OfflineMonitorQueue(socket as any);
+      const queue = new MonitorQueue(socket as any);
 
       (window.api.getTempMonitorLogs as any).mockResolvedValueOnce([
          { filePath: "a.json", data: samplePayload("a") },
@@ -149,7 +149,7 @@ describe("OfflineMonitorQueue", () => {
 
    it("uploads using memory blob first and cleans up when PUT succeeds", async () => {
       const socket = createSocket(true);
-      const queue = new OfflineMonitorQueue(socket as any);
+      const queue = new MonitorQueue(socket as any);
       const blob = new Blob(["abc"], { type: "video/webm" });
       const cleanupSpy = vi.spyOn(queue, "cleanupTransaction");
 
@@ -172,7 +172,7 @@ describe("OfflineMonitorQueue", () => {
 
    it("warns and skips upload when no in-memory blob and no disk path", async () => {
       const socket = createSocket(true);
-      const queue = new OfflineMonitorQueue(socket as any);
+      const queue = new MonitorQueue(socket as any);
       const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
       await queue.handleUploadRecordingUrl({

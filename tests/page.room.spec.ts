@@ -51,8 +51,8 @@ vi.mock("@/app/composables/use-webcam-recorder", () => ({
    }),
 }));
 
-vi.mock("@/lib/offline-monitor-queue", () => ({
-   OfflineMonitorQueue: vi.fn(() => offlineInstance),
+vi.mock("@/lib/monitor-queue", () => ({
+   MonitorQueue: vi.fn(() => offlineInstance),
 }));
 
 vi.mock("naive-ui", () => ({

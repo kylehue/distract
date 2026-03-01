@@ -40,6 +40,8 @@ def _eye_gaze(landmarks, w, h, iris_idx, left_idx, right_idx, top_idx, bot_idx):
 def detect_eye_gaze(
     landmarks,
     frame_shape,
+    hp_yaw,
+    hp_pitch,
     shift_x=0.0,
     shift_y=0.0,  # slight downward shift to account for typical screen position (depends on camera position but they're usually above screen)
 ):
@@ -70,6 +72,11 @@ def detect_eye_gaze(
     # Remap to 0-1 range based on empirical bounds (these may need adjustment per setup)
     gaze_x = map_value(gaze_x, 0.2, 0.8, 0.0, 1.0)
     gaze_y = map_value(gaze_y, 0.1, 0.5, 0.0, 1.0)
+
+    # Add head pose bias
+    hp_bias_weight = 0.1  # how much head pose affects gaze, may need tuning
+    gaze_x += map_value(hp_yaw, 0, 1, -hp_bias_weight, hp_bias_weight)
+    gaze_y += map_value(hp_pitch, 0, 1, -hp_bias_weight, hp_bias_weight)
 
     # Determine categorical gaze_direction
     dirs = []

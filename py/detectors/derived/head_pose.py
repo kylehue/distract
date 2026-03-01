@@ -1,5 +1,6 @@
 import cv2
 import numpy as np
+from utils.math import map_value
 
 # Landmark indices for MediaPipe FaceMesh
 LANDMARKS = {
@@ -86,7 +87,7 @@ def detect_head_pose(landmarks, frame_shape):
             angle += 180
         return np.clip((angle + 45) / 90, 0.0, 1.0)
 
-    yaw_n = _norm(yaw)
+    yaw_n = map_value(_norm(yaw), 1, 0, 0, 1)
     pitch_n = _norm(pitch)
     roll_n = _norm(roll)
 

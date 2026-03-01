@@ -70,7 +70,12 @@ def extract_features_from_image(img) -> dict:
 
     # EYE GAZE
     if mesh["mesh_points"]:
-        gaze = detect_eye_gaze(mesh["mesh_points"], img.shape)
+        gaze = detect_eye_gaze(
+            mesh["mesh_points"],
+            img.shape,
+            features["head_yaw"],
+            features["head_pitch"],
+        )
         features["eye_gaze_x"], features["eye_gaze_y"] = gaze["gaze_point"]
         # features["gaze_direction"] = gaze["gaze_direction"]
     else:

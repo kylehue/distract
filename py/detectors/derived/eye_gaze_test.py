@@ -2,6 +2,7 @@ import cv2
 import numpy as np
 from detectors.face_mesh import detect_face_mesh
 from detectors.derived.eye_gaze import detect_eye_gaze
+from detectors.derived.head_pose import detect_head_pose
 
 
 def overlay_gaze(frame, gaze_data):
@@ -70,7 +71,13 @@ def main():
         mesh_results = detect_face_mesh(frame_rgb)
 
         if mesh_results["mesh_points"] is not None:
-            gaze_data = detect_eye_gaze(mesh_results["mesh_points"], frame.shape)
+            head_pose = detect_head_pose(mesh_results["mesh_points"], frame.shape)
+            gaze_data = detect_eye_gaze(
+                mesh_results["mesh_points"],
+                frame.shape,
+                head_pose["yaw"],
+                head_pose["pitch"],
+            )
             frame = overlay_gaze(frame, gaze_data)
 
         cv2.imshow("Eye Gaze Test", frame)

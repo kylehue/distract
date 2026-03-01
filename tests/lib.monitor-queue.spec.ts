@@ -1,9 +1,6 @@
 import { ref } from "vue";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import {
-   MonitorQueue,
-   type MonitorPayload,
-} from "@/lib/monitor-queue";
+import { MonitorQueue, type MonitorPayload } from "@/lib/monitor-queue";
 
 function createSocket(isOnline = true) {
    return {
@@ -17,8 +14,11 @@ function samplePayload(tx = "tx-1"): MonitorPayload {
       uuid: "uuid-1",
       transactionId: tx,
       roomCode: "ABCD",
-      scores: { warningLevel: "none" },
-      isPhonePresent: false,
+      modelResults: {
+         rf_score: 0.5,
+         if_score: 0.3,
+         is_phone_present: false,
+      },
       mimetype: "video/webm",
       startTime: "2026-01-01T00:00:00.000Z",
       videoPath: `C:/tmp/${tx}.webm`,

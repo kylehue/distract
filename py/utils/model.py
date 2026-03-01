@@ -102,21 +102,28 @@ def extract_frames_from_video(video_path: str, sample_count: int) -> list:
 
 def use_model(video_path: str, sample_count: int):
     try:
-        samples: List[List[int]] = []
-
+        samples: List[dict] = []
         frames = extract_frames_from_video(video_path, sample_count)
 
+        # run CV feature extraction on all frames
         for img in frames:
             if img is None:
                 continue
             img_for_phone_detection = img
             features = extract_features_from_image(img)
-            model_input = [features.get(key, 0) for key in FEATURE_COLUMNS]
-            samples.append(model_input)
+            samples.append(features)
+
+        # run predictions on all samples
+        scores = extract_scores(
+            [[features.get(key, 0) for key in FEATURE_COLUMNS] for features in samples]
+        )
 
         return {
-            "scores": extract_scores(samples),
-            "isPhonePresent": (
+            "rf_score": scores["rf_score"],
+            "if_score": scores["if_score"],
+            "feature_impacts": scores["feature_impacts"],
+            "samples": samples,
+            "is_phone_present": (
                 bool(detect_phone(img_for_phone_detection))
                 if img_for_phone_detection is not None
                 else False
@@ -125,12 +132,11 @@ def use_model(video_path: str, sample_count: int):
     except Exception as e:
         print(f"[use_model] error: {e}", flush=True)
         return {
-            "scores": {
-                "rf_score": 0,
-                "if_score": 0,
-                "feature_impacts": {},
-            },
-            "isPhonePresent": False,
+            "rf_score": 0,
+            "if_score": 0,
+            "feature_impacts": {},
+            "samples": [],
+            "is_phone_present": False,
         }
 
 

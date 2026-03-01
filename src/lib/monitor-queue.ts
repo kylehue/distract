@@ -4,8 +4,7 @@ export type MonitorPayload = {
    uuid: string;
    transactionId: string;
    roomCode: string;
-   scores: any;
-   isPhonePresent: boolean;
+   modelResults: any;
    mimetype: string;
    startTime: string;
    videoPath: string;

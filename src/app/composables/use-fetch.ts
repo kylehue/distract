@@ -1,4 +1,3 @@
-import { keysToCamel } from "@/lib/object";
 import { socket } from "@/lib/socket";
 import { proxyRefs, ref } from "vue";
 
@@ -107,7 +106,7 @@ export function useFetch<T = any>(url: string, method: string = "GET") {
             },
          );
 
-         const json = keysToCamel(await res.json());
+         const json = await res.json();
 
          if (!res.ok) {
             // server-controlled error shape

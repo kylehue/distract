@@ -1,5 +1,4 @@
 import { onUnmounted, computed, unref } from "vue";
-import { keysToCamel } from "@/lib/object";
 import { isConnected as _isConnected, socket } from "@/lib/socket";
 
 export function useSocket() {
@@ -9,7 +8,7 @@ export function useSocket() {
       handler: (data: Record<any, any>) => void,
       { autoClean = true } = {},
    ) {
-      const wrappedHandler = (data: any) => handler(keysToCamel(data));
+      const wrappedHandler = (data: any) => handler(data);
       if (autoClean) {
          onUnmounted(async () => (await socket).off(event, wrappedHandler));
       }
@@ -57,7 +56,7 @@ export function useSocket() {
          console.log(`SERVER ACK -> CLIENT (${event}):\n`, res);
       }
 
-      return keysToCamel(res) as TRes;
+      return res as TRes;
    }
 
    return { socket, isConnected, on, emit, emitWithAck };

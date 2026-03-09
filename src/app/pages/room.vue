@@ -6,7 +6,7 @@
       <Loader text="Joining room..." />
    </div>
    <template v-else-if="!room || !teacher || !student"> Missing data </template>
-   <div v-else class="flex flex-col w-full h-full">
+   <div v-else class="flex flex-col w-full h-full p-6">
       <NText
          class="absolute left-2 bottom-1 text-xs pointer-events-none select-none font-mono"
          :depth="3"

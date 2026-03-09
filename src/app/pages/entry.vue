@@ -1,5 +1,5 @@
 <template>
-   <div class="flex items-center justify-center w-full h-full">
+   <div class="flex items-center justify-center w-full h-full p-4">
       <NForm @keydown.enter="joinRoom()">
          <NFormItem
             label="Student Name"
@@ -34,10 +34,19 @@
          <NButton
             @click="joinRoom()"
             :loading="isLoading"
+            :disabled="!isPrivacyConsentChecked"
             class="mt-2! w-full!"
          >
             Join room
          </NButton>
+         <div class="flex w-full mt-2">
+            <NCheckbox v-model:checked="isPrivacyConsentChecked">
+               I have read and agree to the
+               <RouterLink to="/privacy-policy" class="link">
+                  Privacy Policy
+               </RouterLink>
+            </NCheckbox>
+         </div>
       </NForm>
       <NText
          class="absolute left-2 bottom-1 text-xs pointer-events-none select-none font-mono"
@@ -51,9 +60,17 @@
 
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
-import { NButton, NInput, NForm, NFormItem, NText, useMessage } from "naive-ui";
+import {
+   NButton,
+   NInput,
+   NForm,
+   NFormItem,
+   NText,
+   useMessage,
+   NCheckbox,
+} from "naive-ui";
 import { PhHouseSimple, PhUser } from "@phosphor-icons/vue";
-import { useRouter } from "vue-router";
+import { RouterLink, useRouter } from "vue-router";
 import { RoomInfo, StudentInfo } from "@/lib/typings";
 import { useSocket } from "../composables/use-socket";
 import ThemeSwitch from "../components/theme-switch.vue";
@@ -69,6 +86,7 @@ const roomCodeStatus = ref<"error" | "success">("success");
 const roomCodeFeedback = ref("");
 const appVersion = ref("");
 const isLoading = ref(false);
+const isPrivacyConsentChecked = ref(false);
 
 async function joinRoom() {
    studentNameStatus.value = "success";

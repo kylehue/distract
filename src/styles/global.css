@@ -15,6 +15,17 @@ body {
    overflow: hidden;
 }
 
-#app {
-   padding: 20px;
+.link {
+   @apply hover:underline text-indigo-500;
+}
+
+.dark .link {
+   @apply text-indigo-400;
+}
+
+@layer base {
+   ul,
+   ol {
+      list-style: revert;
+   }
 }

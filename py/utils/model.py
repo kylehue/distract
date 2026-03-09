@@ -3,46 +3,31 @@ import cv2
 import pandas as pd
 from detectors.main import extract_features_from_image
 from detectors.phone import detect_phone
+from utils.math import map_value
 from utils.model_loader import load_if_model, load_rf_model
 import random
 from treeinterpreter import treeinterpreter as ti
 
 
 # Load models
-random_forest_model = load_rf_model()
-isolation_forest_model = load_if_model()
-
-FEATURE_COLUMNS = [
-    "face_x",
-    "face_y",
-    "face_w",
-    "face_h",
-    "face_conf",
-    "eye_gaze_x",
-    "eye_gaze_y",
-    "head_yaw",
-    "head_pitch",
-    "head_roll",
-    "wrist_left_x",
-    "wrist_left_y",
-    "wrist_right_x",
-    "wrist_right_y",
-    "face_count",
-    "hand_count",
-    "face_present",
-]
+random_forest_model_pkg = load_rf_model()
+isolation_forest_model_pkg = load_if_model()
+random_forest_model = random_forest_model_pkg["model"]
+random_forest_model_feature_columns = random_forest_model_pkg["feature_columns"]
+isolation_forest_model = isolation_forest_model_pkg["model"]
+isolation_forest_model_feature_columns = isolation_forest_model_pkg["feature_columns"]
 
 
-def rf_predict(data: List[List[float]]) -> dict:
+def rf_predict(data: List[dict]) -> dict:
     if not data:
         return {"score": 0, "feature_impacts": {}}
 
-    df = pd.DataFrame(data, columns=FEATURE_COLUMNS)
+    df = pd.DataFrame(data, columns=random_forest_model_feature_columns)
     pred, bias, contribs = ti.predict(random_forest_model, df.values)
     scores = pred[:, 0].tolist()
     contribs_class0 = contribs[:, :, 0]
     mean_impacts = [float(score) for score in contribs_class0.mean(axis=0)]
-    avg_feature_impact = dict(zip(FEATURE_COLUMNS, mean_impacts))
+    avg_feature_impact = dict(zip(random_forest_model_feature_columns, mean_impacts))
 
     return {
         "score": sum(scores) / len(scores) if scores else 0,
@@ -50,15 +35,18 @@ def rf_predict(data: List[List[float]]) -> dict:
     }
 
 
-def if_predict(data: List[List[int]]) -> dict:
-    df = pd.DataFrame(data, columns=FEATURE_COLUMNS)
-    scores = isolation_forest_model.decision_function(df).tolist()
+def if_predict(data: List[dict]) -> dict:
+    df = pd.DataFrame(data, columns=isolation_forest_model_feature_columns)
+    scores = (-isolation_forest_model.score_samples(df)).tolist()
+    # map to 0-1 range (0 = anomalous, 1 = normal)
+    # 0.35 and 0.70 are the min/max values according to tests (in colab)
+    scores = [map_value(score, 0.35, 0.70, 1, 0) for score in scores]
     return {
         "score": sum(scores) / len(scores) if scores else 0,
     }
 
 
-def extract_scores(samples: List[List[int]]) -> dict:
+def extract_scores(samples: List[dict]) -> dict:
     # Run predictions concurrently in threads
     if_pred = if_predict(samples)
     rf_pred = rf_predict(samples)
@@ -114,9 +102,7 @@ def use_model(video_path: str, sample_count: int):
             samples.append(features)
 
         # run predictions on all samples
-        scores = extract_scores(
-            [[features.get(key, 0) for key in FEATURE_COLUMNS] for features in samples]
-        )
+        scores = extract_scores(samples)
 
         return {
             "rf_score": scores["rf_score"],
@@ -154,11 +140,8 @@ def warmup_model():
         # warm feature extraction
         features = extract_features_from_image(img)
 
-        # build a single fake model input row
-        model_input = [features.get(key, 0) for key in FEATURE_COLUMNS]
-
         # warm sklearn + treeinterpreter
-        extract_scores([model_input])
+        extract_scores([features])
 
         # warm phone detector
         detect_phone(img)

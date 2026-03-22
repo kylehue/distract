@@ -97,7 +97,7 @@ describe("useFetch", () => {
          json: async () => ({
             detail: {
                message: "Validation failed",
-               field_errors: { room_code: "Invalid code" },
+               fieldErrors: { room_code: "Invalid code" },
             },
          }),
       });

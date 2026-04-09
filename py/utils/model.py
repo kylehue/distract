@@ -99,7 +99,23 @@ def use_model(video_path: str, sample_count: int):
                 continue
             img_for_phone_detection = img
             features = extract_features_from_image(img)
+
+            # skip useless frames
+            face_count = features.get("face_count", 0)
+            face_conf = features.get("face_conf", 0)
+            if face_count == 0 or face_conf < 0.3:
+                continue
+
             samples.append(features)
+
+        if not samples:
+            return {
+                "rf_score": 0.8,
+                "if_score": 0.8,
+                "feature_impacts": {},
+                "samples": [],
+                "is_phone_present": False,
+            }
 
         # run predictions on all samples
         scores = extract_scores(samples)
@@ -118,8 +134,8 @@ def use_model(video_path: str, sample_count: int):
     except Exception as e:
         print(f"[use_model] error: {e}", flush=True)
         return {
-            "rf_score": 0,
-            "if_score": 0,
+            "rf_score": 0.8,
+            "if_score": 0.8,
             "feature_impacts": {},
             "samples": [],
             "is_phone_present": False,

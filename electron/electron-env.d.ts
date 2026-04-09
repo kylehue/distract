@@ -49,6 +49,8 @@ interface Window {
       setShowCloseWarningDialog: (value: boolean) => Promise<void>;
       getTheme: () => Promise<"light" | "dark">;
       setTheme: (mode: "light" | "dark") => Promise<"light" | "dark">;
+      askCameraPermission: () => Promise<boolean>;
+      askMicrophonePermission: () => Promise<boolean>;
    };
    splash: {
       onStatus: (cb: (text: string) => void) => void;

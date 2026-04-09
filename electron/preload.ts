@@ -67,6 +67,8 @@ contextBridge.exposeInMainWorld("api", {
    getTheme: (): Promise<"light" | "dark"> => ipcRenderer.invoke("get-theme"),
    setTheme: (mode: "light" | "dark"): Promise<"light" | "dark"> =>
       ipcRenderer.invoke("set-theme", mode),
+   askCameraPermission: () => ipcRenderer.invoke("askCameraPermission"),
+   askMicrophonePermission: () => ipcRenderer.invoke("askMicrophonePermission"),
 });
 
 contextBridge.exposeInMainWorld("splash", {

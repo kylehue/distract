@@ -17,7 +17,7 @@ export function useWebcamRecorder(
    stream: Ref<MediaStream | null>,
    options: RecordingOptions,
 ) {
-   const { chunkIntervalMillis = 5000, mimeType = "video/webm;codecs=vp9" } =
+   const { chunkIntervalMillis = 5000, mimeType = "video/webm" } =
       options;
 
    const isRecording = ref(false);

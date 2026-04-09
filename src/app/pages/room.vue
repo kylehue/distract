@@ -73,12 +73,19 @@ import { useInterval } from "../composables/use-interval";
 import { MonitorQueue, type MonitorPayload } from "@/lib/monitor-queue";
 import { usePing } from "../composables/use-ping";
 import Loader from "../components/loader.vue";
+import { useLiveKit } from "../composables/use-live-kit";
+import { useMediaStream } from "../composables/use-media-stream";
 
 const router = useRouter();
 const route = useRoute();
 const socket = useSocket();
 const message = useMessage();
 const ping = usePing();
+const mediaStream = useMediaStream();
+const liveKit = useLiveKit(mediaStream.stream);
+const webcamRecorder = useWebcamRecorder(mediaStream.stream, {
+   chunkIntervalMillis: MONITOR_LOG_INTERVAL_MILLIS,
+});
 
 const room = ref<RoomInfo>();
 const teacher = ref<TeacherInfo>();
@@ -86,11 +93,29 @@ const student = ref<StudentInfo>();
 const isJoinRoomLoading = ref(false);
 const isLeaveRoomLoading = ref(false);
 
-const webcamRecorder = useWebcamRecorder({
-   chunkIntervalMillis: MONITOR_LOG_INTERVAL_MILLIS,
-});
-
 const monitorQueue = new MonitorQueue(socket);
+
+async function startCapture() {
+   if (!room.value) {
+      message.error("Room doesn't exist");
+      return;
+   }
+   try {
+      await mediaStream.start();
+   } catch (e: any) {
+      message.error(e);
+   } finally {
+      // TODO: temporarily disable to save bandwidth
+      await liveKit.connect(room.value.code);
+      await webcamRecorder.startRecording();
+   }
+}
+
+function stopCapture() {
+   webcamRecorder.stopRecording();
+   liveKit.disconnect();
+   mediaStream.stop();
+}
 
 async function joinRoom() {
    isJoinRoomLoading.value = true;
@@ -125,10 +150,11 @@ async function joinRoom() {
 async function leaveRoom() {
    isLeaveRoomLoading.value = true;
    try {
-      webcamRecorder.stopRecording();
+      stopCapture();
       monitorQueue.clearMemoryOnly();
       await socket.emitWithAck("student:leave_room", {}, 5000);
       router.push("/");
+      liveKit.disconnect();
    } catch {
       message.error("Failed to leave the room. Please try again.");
    } finally {
@@ -211,7 +237,7 @@ onMounted(async () => {
 });
 
 onBeforeUnmount(() => {
-   webcamRecorder.stopRecording();
+   stopCapture();
 });
 
 // real-time updates
@@ -257,15 +283,15 @@ watch(
    ],
    () => {
       if (student.value?.lockMonitorLogId) {
-         webcamRecorder.stopRecording();
+         stopCapture();
          return;
       }
 
       if (room.value?.status === "monitoring" && student.value?.permitted) {
-         webcamRecorder.startRecording();
+         startCapture();
          window.api.setShowCloseWarningDialog(true);
       } else {
-         webcamRecorder.stopRecording();
+         stopCapture();
          window.api.setShowCloseWarningDialog(false);
       }
    },

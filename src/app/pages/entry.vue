@@ -89,6 +89,21 @@ const isLoading = ref(false);
 const isPrivacyConsentChecked = ref(false);
 
 async function joinRoom() {
+   const isCameraAllowed = await window.api.askCameraPermission();
+   if (!isCameraAllowed) {
+      message.error(
+         "Camera is required to join a room. Please read our Privacy Policy for more information.",
+      );
+      return;
+   }
+   const isMicrophoneAllowed = await window.api.askMicrophonePermission();
+   if (!isMicrophoneAllowed) {
+      message.error(
+         "Microphone is required to join a room. Please read our Privacy Policy for more information.",
+      );
+      return;
+   }
+
    studentNameStatus.value = "success";
    studentNameFeedback.value = "";
    roomCodeStatus.value = "success";

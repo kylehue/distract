@@ -7,29 +7,110 @@ from detectors.main import extract_features_from_image
 from utils.model import extract_scores
 
 WINDOW_SECONDS = 5
-FRAMES_PER_WINDOW = 5
+FRAMES_PER_WINDOW = 10
 FRAME_INTERVAL_SECONDS = WINDOW_SECONDS / FRAMES_PER_WINDOW
 
 
-def compute_rb_score(samples: List[dict]) -> float:
-    rb_score = 1.0
-    threshold = 0.2
+def _map_midpoint_to_score(
+    value: float, midpoint: float, threshold: float | None = None
+) -> float:
+    if threshold is None:
+        threshold = 0.0  # default = no dead zone
 
+    d = abs(value - midpoint)
+    half_t = threshold / 2
+
+    # inside dead zone
+    if d <= half_t:
+        return 0.0
+
+    max_d = max(midpoint, 1 - midpoint)
+
+    # avoid division by zero (midpoint at edge = trash input)
+    if max_d == half_t:
+        return 1.0
+
+    # normalize distance outside threshold
+    score = (d - half_t) / (max_d - half_t)
+
+    # clamp just in case
+    return max(0.0, min(1.0, score))
+
+
+def _compute_integrity_score_from_model_results(model_results: dict) -> float:
+    samples = model_results.get("samples", [])
+    n = len(samples)
+    rf_score = model_results.get("rf_score", 0)
+    if_score = model_results.get("if_score", 0)
+    rb_score = 1
+    eye_weight = 0.8
+    head_pose_weight = 0.05
+    face_weight = 0.15
+
+    preprocessed_samples = []
     for sample in samples:
+        face_conf = sample.get("face_conf", 0)
+        face_count = sample.get("face_count", 0)
+        if face_count == 0 or face_conf < 0.3:
+            continue
+        preprocessed_samples.append(sample)
+
+    for sample in preprocessed_samples:
+        # eye
         eye_gaze_x = sample.get("eye_gaze_x", 0)
-        if eye_gaze_x < threshold:
-            rb_score *= max(0, 0.9 - (threshold - eye_gaze_x))
-        if eye_gaze_x > (1 - threshold):
-            rb_score *= max(0, 0.9 - (eye_gaze_x - (1 - threshold)))
+        rb_score -= (
+            _map_midpoint_to_score(
+                eye_gaze_x,
+                midpoint=0.5,
+                threshold=0.3,
+            )
+            * eye_weight
+            / n
+        )
 
-    return rb_score
+        # head pose
+        head_pose_yaw = sample.get("head_yaw", 0)
+        rb_score -= (
+            _map_midpoint_to_score(
+                head_pose_yaw,
+                midpoint=0.5,
+                threshold=0.2,
+            )
+            * head_pose_weight
+            / n
+        )
 
+        # face
+        face_conf = sample.get("face_conf", 0)
+        face_x = sample.get("face_x", 0)
+        face_y = sample.get("face_y", 0)
+        face_conf_weight = face_weight * 0.5
+        face_x_weight = face_weight * 0.25
+        face_y_weight = face_weight * 0.25
+        rb_score -= (1 - face_conf) * face_conf_weight / n
+        rb_score -= (
+            _map_midpoint_to_score(
+                face_x,
+                midpoint=0.5,
+                threshold=0.4,
+            )
+            * face_x_weight
+            / n
+        )
+        rb_score -= (
+            _map_midpoint_to_score(
+                face_y,
+                midpoint=0.5,
+                threshold=0.4,
+            )
+            * face_y_weight
+            / n
+        )
 
-def compute_integrity_score(rf_score: float, if_score: float, rb_score: float) -> float:
-    rb_weight = 0.3
-    rf_weight = 0.5
-    if_weight = 0.2
-    return rb_weight * rb_score + rf_weight * rf_score + if_weight * if_score
+    rb_weight = 0.8
+    rf_weight = 0.15
+    if_weight = 0.05
+    return rb_weight * rb_score + rf_weight * rf_score + if_weight * if_score, rb_score
 
 
 def score_window(samples: List[dict]) -> Dict[str, float]:
@@ -45,8 +126,13 @@ def score_window(samples: List[dict]) -> Dict[str, float]:
 
     rf_score = float(model_scores.get("rf_score", 0))
     if_score = float(model_scores.get("if_score", 0))
-    rb_score = compute_rb_score(samples)
-    integrity_score = compute_integrity_score(rf_score, if_score, rb_score)
+    integrity_score, rb_score = _compute_integrity_score_from_model_results(
+        {
+            "rf_score": rf_score,
+            "if_score": if_score,
+            "samples": samples,
+        }
+    )
 
     return {
         "rf_score": rf_score,

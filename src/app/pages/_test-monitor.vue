@@ -28,7 +28,9 @@ import {
    MONITOR_LOG_NUMBER_OF_SAMPLES,
 } from "@/lib/constants";
 import { useWebcamRecorder } from "../composables/use-webcam-recorder";
-const webcamRecorder = useWebcamRecorder({
+import { useMediaStream } from "../composables/use-media-stream";
+const mediaStream = useMediaStream();
+const webcamRecorder = useWebcamRecorder(mediaStream.stream, {
    chunkIntervalMillis: MONITOR_LOG_INTERVAL_MILLIS,
 });
 

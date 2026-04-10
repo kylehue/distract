@@ -51,6 +51,7 @@ describe("useWebcamRecorder", () => {
    let getUserMediaSpy: ReturnType<typeof vi.fn>;
    let trackStopSpy: ReturnType<typeof vi.fn>;
    let api: any;
+   let stream: any;
 
    beforeEach(async () => {
       vi.useFakeTimers();
@@ -79,10 +80,13 @@ describe("useWebcamRecorder", () => {
 
       const { useWebcamRecorder } =
          await import("@/app/composables/use-webcam-recorder");
+      const { useMediaStream } =
+         await import("@/app/composables/use-media-stream");
       mount(
          defineComponent({
             setup() {
-               api = useWebcamRecorder({ chunkIntervalMillis: 1000 });
+               stream = useMediaStream();
+               api = useWebcamRecorder(stream.stream, { chunkIntervalMillis: 1000 });
                return () => h("div");
             },
          }),

@@ -11,6 +11,10 @@ FRAMES_PER_WINDOW = 10
 FRAME_INTERVAL_SECONDS = WINDOW_SECONDS / FRAMES_PER_WINDOW
 
 
+def _clamp(value: float, min_value: float, max_value: float) -> float:
+    return max(min_value, min(max_value, value))
+
+
 def _map_midpoint_to_score(
     value: float, midpoint: float, threshold: float | None = None
 ) -> float:
@@ -34,7 +38,7 @@ def _map_midpoint_to_score(
     score = (d - half_t) / (max_d - half_t)
 
     # clamp just in case
-    return max(0.0, min(1.0, score))
+    return _clamp(score, 0.0, 1.0)
 
 
 def _compute_integrity_score_from_model_results(model_results: dict) -> float:
@@ -55,10 +59,14 @@ def _compute_integrity_score_from_model_results(model_results: dict) -> float:
             continue
         preprocessed_samples.append(sample)
 
+    eye_score_sum = 0
+    head_pose_score_sum = 0
+    face_score_sum = 0
+
     for sample in preprocessed_samples:
         # eye
-        eye_gaze_x = sample.get("eye_gaze_x", 0)
-        rb_score -= (
+        eye_gaze_x = _clamp(sample.get("eye_gaze_x", 0), 0, 1)
+        eye_score_sum += (
             _map_midpoint_to_score(
                 eye_gaze_x,
                 midpoint=0.5,
@@ -68,9 +76,17 @@ def _compute_integrity_score_from_model_results(model_results: dict) -> float:
             / n
         )
 
+        # eye y should cancel out the eye x if they're looking up
+        eye_gaze_y = _clamp(sample.get("eye_gaze_y", 0), 0, 1)
+        look_up_threshold = 0.15
+        if eye_gaze_y < look_up_threshold:
+            contrast = look_up_threshold - eye_gaze_y
+            norm = contrast / look_up_threshold
+            eye_score_sum -= norm * eye_weight / n
+
         # head pose
-        head_pose_yaw = sample.get("head_yaw", 0)
-        rb_score -= (
+        head_pose_yaw = _clamp(sample.get("head_yaw", 0), 0, 1)
+        head_pose_score_sum += (
             _map_midpoint_to_score(
                 head_pose_yaw,
                 midpoint=0.5,
@@ -81,14 +97,14 @@ def _compute_integrity_score_from_model_results(model_results: dict) -> float:
         )
 
         # face
-        face_conf = sample.get("face_conf", 0)
-        face_x = sample.get("face_x", 0)
-        face_y = sample.get("face_y", 0)
+        face_conf = _clamp(sample.get("face_conf", 0), 0, 1)
+        face_x = _clamp(sample.get("face_x", 0), 0, 1)
+        face_y = _clamp(sample.get("face_y", 0), 0, 1)
         face_conf_weight = face_weight * 0.5
         face_x_weight = face_weight * 0.25
         face_y_weight = face_weight * 0.25
-        rb_score -= (1 - face_conf) * face_conf_weight / n
-        rb_score -= (
+        face_score_sum += (1 - face_conf) * face_conf_weight / n
+        face_score_sum += (
             _map_midpoint_to_score(
                 face_x,
                 midpoint=0.5,
@@ -97,7 +113,7 @@ def _compute_integrity_score_from_model_results(model_results: dict) -> float:
             * face_x_weight
             / n
         )
-        rb_score -= (
+        face_score_sum += (
             _map_midpoint_to_score(
                 face_y,
                 midpoint=0.5,
@@ -106,6 +122,11 @@ def _compute_integrity_score_from_model_results(model_results: dict) -> float:
             * face_y_weight
             / n
         )
+
+    eye_score_sum = _clamp(eye_score_sum, 0, eye_weight)
+    head_pose_score_sum = _clamp(head_pose_score_sum, 0, head_pose_weight)
+    face_score_sum = _clamp(face_score_sum, 0, face_weight)
+    rb_score -= eye_score_sum + head_pose_score_sum + face_score_sum
 
     rb_weight = 0.8
     rf_weight = 0.15

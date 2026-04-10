@@ -102,12 +102,10 @@ async function startCapture() {
    }
    try {
       await mediaStream.start();
-   } catch (e: any) {
-      message.error(e);
-   } finally {
-      // TODO: temporarily disable to save bandwidth
       await liveKit.connect(room.value.code);
       await webcamRecorder.startRecording();
+   } catch (e: any) {
+      message.error(e);
    }
 }
 

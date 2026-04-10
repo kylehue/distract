@@ -18,6 +18,7 @@ export function useLiveKit(stream: Ref<MediaStream | null>) {
    const fetchToken = useFetch<string>("/api/livekit-token/student", "POST");
 
    async function connect(roomCode: string) {
+      if (isConnected.value) return;
       if (!stream.value) {
          throw new Error("MediaStream not initialized");
       }
@@ -47,20 +48,28 @@ export function useLiveKit(stream: Ref<MediaStream | null>) {
          throw new Error("Missing media tracks");
       }
 
-      videoTrack.value = new LocalVideoTrack(rawVideoTrack);
-      audioTrack.value = new LocalAudioTrack(rawAudioTrack);
-
       await _room.connect(url, token, {
          autoSubscribe: false,
       });
 
       // publish tracks
-      await _room.localParticipant.publishTrack(
-         videoTrack.value as LocalVideoTrack,
+      const videoPublication = await _room.localParticipant.publishTrack(
+         rawVideoTrack,
+         {
+            name: "camera",
+            simulcast: false,
+         },
       );
-      await _room.localParticipant.publishTrack(
-         audioTrack.value as LocalAudioTrack,
+
+      const audioPublication = await _room.localParticipant.publishTrack(
+         rawAudioTrack,
+         {
+            name: "microphone",
+         },
       );
+
+      videoTrack.value = videoPublication.track as LocalVideoTrack;
+      audioTrack.value = audioPublication.track as LocalAudioTrack;
 
       isConnected.value = true;
 

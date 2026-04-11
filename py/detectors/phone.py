@@ -2,11 +2,11 @@ from ultralytics import YOLO
 import torch
 
 # Load YOLOv8m model
-model = YOLO("yolov8n.pt")
+model = YOLO("yolo26s.pt")
 model.fuse()  # small speed & stability boost
 
 
-def detect_phone(frame, conf_thresh=0.35):
+def detect_phone(frame, conf_thresh=0.5):
     h, w = frame.shape[:2]
 
     # Run prediction

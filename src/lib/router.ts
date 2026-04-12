@@ -2,10 +2,12 @@ import { createRouter, createWebHashHistory, RouteRecordRaw } from "vue-router";
 import EntryPage from "@/app/pages/entry.vue";
 import RoomPage from "@/app/pages/room.vue";
 import PrivacyPolicyPage from "@/app/pages/privacy-policy.vue";
+import CaptureAvatarPage from "@/app/pages/capture-avatar.vue";
 
 const routes: RouteRecordRaw[] = [
    { path: "/", redirect: "/entry" },
    { path: "/entry", component: EntryPage },
+   { path: "/capture-avatar/:roomCode", component: CaptureAvatarPage },
    { path: "/room/:roomCode", component: RoomPage },
    { path: "/privacy-policy", component: PrivacyPolicyPage },
    // {

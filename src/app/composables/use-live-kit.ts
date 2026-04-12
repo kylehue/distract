@@ -41,8 +41,8 @@ export function useLiveKit(stream: Ref<MediaStream | null>) {
       room.value = _room;
 
       // Use EXISTING tracks from shared stream
-      const rawVideoTrack = stream.value.getVideoTracks()[0];
-      const rawAudioTrack = stream.value.getAudioTracks()[0];
+      const rawVideoTrack = stream.value.getVideoTracks()[0].clone();
+      const rawAudioTrack = stream.value.getAudioTracks()[0].clone();
 
       if (!rawVideoTrack || !rawAudioTrack) {
          throw new Error("Missing media tracks");

@@ -127,7 +127,7 @@ async function joinRoom() {
       if (data.fieldErrors) throw { fieldErrors: data.fieldErrors };
 
       router.push({
-         path: "/room/" + data!.room.code,
+         path: "/capture-avatar/" + data!.room.code,
          query: {
             studentName: data!.student.name,
          },

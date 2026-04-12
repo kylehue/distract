@@ -24,20 +24,7 @@
          </div>
       </div>
       <div class="flex flex-col flex-1 items-center justify-center gap-4">
-         <div class="relative w-1/2">
-            <VideoTile class="w-full" :stream="mediaStream.stream.value" />
-            <div class="flex items-center gap-2 absolute w-full top-0 p-1 px-2">
-               <NText
-                  class="bg-[rgba(0,0,0,0.5)] px-2 rounded text-xs flex items-center gap-2"
-               >
-                  Camera Preview
-                  <InfoTooltip>
-                     If the camera doesn't work, make sure permissions are
-                     granted and other apps aren't using the camera.
-                  </InfoTooltip>
-               </NText>
-            </div>
-         </div>
+         <VideoTile class="w-[80vmin] mx-4 mt-2" :stream="mediaStream.stream.value" />
          <NText v-if="student.lockMonitorLogId" class="text-lg" type="error">
             Your system has been locked due to suspicious behavior.
          </NText>
@@ -90,7 +77,6 @@ import Loader from "../components/loader.vue";
 import { useLiveKit } from "../composables/use-live-kit";
 import { useMediaStream } from "../composables/use-media-stream";
 import VideoTile from "../components/video-tile.vue";
-import InfoTooltip from "../components/info-tooltip.vue";
 
 const router = useRouter();
 const route = useRoute();
@@ -116,6 +102,14 @@ async function startCapture() {
       message.error("Room doesn't exist");
       return;
    }
+   
+   // start camera
+   try {
+      await mediaStream.start();
+   } catch (e: any) {
+      message.error(e);
+   }
+   
    await liveKit.connect(room.value.code);
    await webcamRecorder.startRecording();
 }

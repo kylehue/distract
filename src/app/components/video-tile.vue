@@ -7,7 +7,7 @@
             <PhUser size="50%" />
          </div>
       </div>
-      <div class="flex items-center gap-2 absolute w-full top-0 p-1 px-2">
+      <div class="flex items-center gap-2 absolute w-full top-0 p-1 px-2 *:text-white!">
          <NText
             class="bg-[rgba(0,0,0,0.5)] px-2 rounded text-xs flex items-center gap-2"
          >

@@ -17,7 +17,7 @@
             class="w-[100vmin]"
          />
 
-         <div class="flex justify-start">
+         <div class="flex justify-start gap-2">
             <NButton
                type="primary"
                :loading="isCaptureLoading"
@@ -26,6 +26,7 @@
             >
                Capture and Join Room
             </NButton>
+            <NButton @click="router.back()"> Go back </NButton>
          </div>
       </div>
 

@@ -3,11 +3,10 @@ from typing import Dict, List
 
 import cv2
 
-from detectors.main import extract_features_from_image
-from utils.model import extract_scores
+from utils.model import extract_scores, use_model  # unchanged import
 
-WINDOW_SECONDS = 5
-FRAMES_PER_WINDOW = 10
+WINDOW_SECONDS = 6
+FRAMES_PER_WINDOW = 8
 FRAME_INTERVAL_SECONDS = WINDOW_SECONDS / FRAMES_PER_WINDOW
 
 
@@ -134,41 +133,13 @@ def _compute_integrity_score_from_model_results(model_results: dict) -> float:
     return rb_weight * rb_score + rf_weight * rf_score + if_weight * if_score, rb_score
 
 
-def score_window(samples: List[dict]) -> Dict[str, float]:
-    if not samples:
-        return {
-            "rf_score": 0.0,
-            "if_score": 0.0,
-            "rb_score": 0.0,
-            "integrity_score": 0.0,
-        }
-
-    model_scores = extract_scores(samples)
-
-    rf_score = float(model_scores.get("rf_score", 0))
-    if_score = float(model_scores.get("if_score", 0))
-    integrity_score, rb_score = _compute_integrity_score_from_model_results(
-        {
-            "rf_score": rf_score,
-            "if_score": if_score,
-            "samples": samples,
-        }
-    )
-
-    return {
-        "rf_score": rf_score,
-        "if_score": if_score,
-        "rb_score": rb_score,
-        "integrity_score": integrity_score,
-    }
-
-
 def overlay_scores_vertical(frame, scores: Dict[str, float], sample_count: int) -> None:
     lines = [
         f"RF Score: {scores['rf_score']:.4f}",
         f"IF Score: {scores['if_score']:.4f}",
         f"RB Score: {scores['rb_score']:.4f}",
         f"Integrity Score: {scores['integrity_score']:.4f}",
+        f"Phone Present: {scores['is_phone_present']:.4f}",
         f"Samples: {sample_count}/{FRAMES_PER_WINDOW} ({WINDOW_SECONDS}s window)",
     ]
 
@@ -214,10 +185,11 @@ def main() -> None:
         "rf_score": 0.0,
         "if_score": 0.0,
         "rb_score": 0.0,
+        "is_phone_present": False,
         "integrity_score": 0.0,
     }
 
-    window_samples: List[dict] = []
+    window_frames: List = []
     window_start = time.monotonic()
     window_end = window_start + WINDOW_SECONDS
     next_sample_time = window_start
@@ -232,23 +204,45 @@ def main() -> None:
 
         while now >= window_end:
             try:
-                current_scores = score_window(window_samples)
+                model_results = use_model(frames=window_frames)
+
+                rf_score = float(model_results.get("rf_score", 0))
+                if_score = float(model_results.get("if_score", 0))
+
+                integrity_score, rb_score = _compute_integrity_score_from_model_results(
+                    {
+                        "rf_score": rf_score,
+                        "if_score": if_score,
+                        "samples": model_results.get("samples", []),
+                    }
+                )
+
+                is_phone_present = model_results.get("is_phone_present", False)
+
+                current_scores = {
+                    "rf_score": rf_score,
+                    "if_score": if_score,
+                    "rb_score": rb_score,
+                    "integrity_score": integrity_score,
+                    "is_phone_present": is_phone_present,
+                }
+
             except Exception as error:
                 print(f"[model_test] scoring error: {error}", flush=True)
-            window_samples = []
+
+            window_frames = []
             window_start = window_end
             window_end = window_start + WINDOW_SECONDS
             next_sample_time = window_start
 
-        if len(window_samples) < FRAMES_PER_WINDOW and now >= next_sample_time:
+        if len(window_frames) < FRAMES_PER_WINDOW and now >= next_sample_time:
             try:
-                features = extract_features_from_image(frame)
-                window_samples.append(features)
+                window_frames.append(frame.copy())
             except Exception as error:
-                print(f"[model_test] feature extraction error: {error}", flush=True)
+                print(f"[model_test] frame capture error: {error}", flush=True)
             next_sample_time += FRAME_INTERVAL_SECONDS
 
-        overlay_scores_vertical(frame, current_scores, len(window_samples))
+        overlay_scores_vertical(frame, current_scores, len(window_frames))
         cv2.imshow("Model Test", frame)
 
         if cv2.waitKey(1) & 0xFF == ord("q"):

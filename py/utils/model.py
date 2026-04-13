@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 import cv2
 import pandas as pd
 from detectors.main import extract_features_from_image
@@ -7,6 +7,7 @@ from utils.math import map_value
 from utils.model_loader import load_if_model, load_rf_model
 import random
 from treeinterpreter import treeinterpreter as ti
+import numpy as np
 
 
 # Load models
@@ -88,24 +89,36 @@ def extract_frames_from_video(video_path: str, sample_count: int) -> list:
     return frames
 
 
-def use_model(video_path: str, sample_count: int):
+def use_model(
+    *,
+    video_path: Optional[str] = None,
+    sample_count: int = 10,
+    frames: Optional[List[np.ndarray]] = None,
+):
     try:
         samples: List[dict] = []
-        frames = extract_frames_from_video(video_path, sample_count)
 
-        # run CV feature extraction on all frames
-        for img in frames:
+        # decide source of frames
+        if frames is not None:
+            input_frames = frames
+        elif video_path is not None:
+            input_frames = extract_frames_from_video(video_path, sample_count)
+        else:
+            raise ValueError("Either frames or video_path must be provided")
+
+        # run CV feature extraction
+        for img in input_frames:
             if img is None:
                 continue
 
-            # skip useless frames
             features = extract_features_from_image(img)
+
             face_count = features.get("face_count", 0)
             face_conf = features.get("face_conf", 0)
+
+            # skip useless frames
             if face_count == 0 or face_conf < 0.3:
                 continue
-            
-            img_for_phone_detection = img
 
             samples.append(features)
 
@@ -118,7 +131,6 @@ def use_model(video_path: str, sample_count: int):
                 "is_phone_present": False,
             }
 
-        # run predictions on all samples
         scores = extract_scores(samples)
 
         return {
@@ -127,11 +139,10 @@ def use_model(video_path: str, sample_count: int):
             "feature_impacts": scores["feature_impacts"],
             "samples": samples,
             "is_phone_present": (
-                bool(detect_phone(img_for_phone_detection))
-                if img_for_phone_detection is not None
-                else False
+                bool(detect_phone(input_frames)) if input_frames is not None else False
             ),
         }
+
     except Exception as e:
         print(f"[use_model] error: {e}", flush=True)
         return {

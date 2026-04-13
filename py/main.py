@@ -29,7 +29,13 @@ def handle_message(msg):
     if typ == "use_model":
         video_path = msg["videoPath"]
         sample_count = msg["sampleCount"]
-        return {"correlationId": cid, "value": use_model(video_path, sample_count)}
+        return {
+            "correlationId": cid,
+            "value": use_model(
+                video_path=video_path,
+                sample_count=sample_count,
+            ),
+        }
 
     if typ == "ping":
         return {"correlationId": cid, "value": "pong"}

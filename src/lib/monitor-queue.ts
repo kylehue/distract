@@ -85,7 +85,7 @@ export class MonitorQueue {
     * Bulk flush queued logs. Safe to call repeatedly.
     * Deletes only accepted files.
     */
-   async flushQueuedLogs({ chunkSize = 25, timeoutMs = 15000 } = {}) {
+   async flushQueuedLogs({ chunkSize = 25, timeoutMs = 30000 } = {}) {
       if (!this.socket.isConnected.value) return;
 
       const items = await window.api.getTempMonitorLogs();

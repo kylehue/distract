@@ -99,13 +99,13 @@ def use_model(video_path: str, sample_count: int):
                 continue
 
             # skip useless frames
+            features = extract_features_from_image(img)
             face_count = features.get("face_count", 0)
             face_conf = features.get("face_conf", 0)
             if face_count == 0 or face_conf < 0.3:
                 continue
             
             img_for_phone_detection = img
-            features = extract_features_from_image(img)
 
             samples.append(features)
 

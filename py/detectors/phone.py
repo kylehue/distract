@@ -50,7 +50,7 @@ from ultralytics import YOLO
 
 # Load YOLOv8m model
 model = YOLO(
-    "https://storage.googleapis.com/alpha-ultralytics-ap/users/user_3CD4lgwv5yQJGZ1IssDRHq52azV/models/69dcd0fb274fa9ab7c3ef30f/best.pt?X-Goog-Algorithm=GOOG4-HMAC-SHA256&X-Goog-Credential=GOOG1EVYATYKKOGSZSQSTG4P6ISYXQTE4HWDCBAWNAEWGN34SPK6JC6CK22HP%2F20260413%2Fauto%2Fstorage%2Fgoog4_request&X-Goog-Date=20260413T133023Z&X-Goog-Expires=3600&X-Goog-SignedHeaders=host&response-content-disposition=attachment%3B%20filename%3D%22mobile-phone-detection.pt%22&X-Goog-Signature=11dcfa45d715d38035efb2f3f08978fbd89d26550f1d533d059e2e801752318c"
+    "https://github.com/kylehue/distract-model/releases/latest/download/phone_model.pt"
 )
 model.fuse()  # small speed & stability boost
 
